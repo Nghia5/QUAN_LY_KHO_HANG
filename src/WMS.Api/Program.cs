@@ -12,6 +12,7 @@ builder.Services.AddDbContext<WmsDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddExceptionHandler<ProductSkuConflictExceptionHandler>();
+builder.Services.AddExceptionHandler<ProductInUseExceptionHandler>();
 builder.Services.AddProblemDetails();
 builder.Services.AddSwaggerGen();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi

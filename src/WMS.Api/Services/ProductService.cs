@@ -88,7 +88,15 @@ public sealed class ProductService(WmsDbContext dbContext) : IProductService
         }
 
         dbContext.Products.Remove(product);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception)
+            when (exception.GetBaseException() is SqlException { Number: 547 })
+        {
+            throw new ProductInUseException();
+        }
 
         return true;
     }
