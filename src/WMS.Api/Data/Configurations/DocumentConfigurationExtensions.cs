@@ -12,7 +12,8 @@ public static class DocumentConfigurationExtensions
     {
         builder.ToTable(tableName, table => table.HasCheckConstraint(
             $"CK_{tableName}_Status",
-            "[Status] IN ('Draft', 'PendingApproval', 'Approved', 'InProgress', 'Completed', 'Rejected', 'Cancelled')"));
+            "[Status] IN ('Draft', 'PendingApproval', 'Approved', 'InProgress', 'Completed', 'Rejected', 'Cancelled', " +
+            "'Picked', 'InTransit', 'Received')"));
 
         builder.HasKey(document => document.Id);
 

@@ -9,7 +9,23 @@ public enum DocumentStatus
     InProgress = 4,
     Completed = 5,
     Rejected = 6,
-    Cancelled = 7
+    Cancelled = 7,
+
+    /// <summary>Transfer: goods picked at the source, still reserved there.</summary>
+    Picked = 8,
+
+    /// <summary>Transfer: goods left the source (TRANSFER_OUT posted), not yet received.</summary>
+    InTransit = 9,
+
+    /// <summary>Transfer: goods received at the destination (TRANSFER_IN posted).</summary>
+    Received = 10
+}
+
+/// <summary>Which state machine a document follows.</summary>
+public enum DocumentFlow
+{
+    Standard,
+    Transfer
 }
 
 /// <summary>
@@ -67,4 +83,7 @@ public abstract class WarehouseDocument
     public byte[] RowVersion { get; set; } = [];
 
     public Warehouse? Warehouse { get; set; }
+
+    /// <summary>State machine of this document type (not mapped: read-only property).</summary>
+    public virtual DocumentFlow Flow => DocumentFlow.Standard;
 }

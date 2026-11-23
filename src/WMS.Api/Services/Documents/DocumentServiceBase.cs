@@ -11,7 +11,14 @@ namespace WMS.Api.Services.Documents;
 public static class DocumentStatuses
 {
     public static readonly DocumentStatus[] Open =
-        [DocumentStatus.Draft, DocumentStatus.PendingApproval, DocumentStatus.Approved, DocumentStatus.InProgress, DocumentStatus.Rejected];
+    [
+        DocumentStatus.Draft, DocumentStatus.PendingApproval, DocumentStatus.Approved, DocumentStatus.InProgress,
+        DocumentStatus.Rejected, DocumentStatus.Picked, DocumentStatus.InTransit, DocumentStatus.Received
+    ];
+
+    /// <summary>Statuses before approval: cancelling them needs no approve permission.</summary>
+    public static readonly DocumentStatus[] BeforeApproval =
+        [DocumentStatus.Draft, DocumentStatus.PendingApproval, DocumentStatus.Rejected];
 }
 
 /// <summary>
@@ -100,7 +107,7 @@ public abstract class DocumentServiceBase<TDocument, TDetail>(
         await RunAsync(id, "CANCELLED", async document =>
         {
             var previous = document.Status;
-            if (previous is DocumentStatus.Approved or DocumentStatus.InProgress && !currentUser.HasPermission(ApprovePermission))
+            if (!DocumentStatuses.BeforeApproval.Contains(previous) && !currentUser.HasPermission(ApprovePermission))
             {
                 throw new ForbiddenException($"Cancelling an approved {DisplayName.ToLowerInvariant()} requires {ApprovePermission}.");
             }
@@ -148,7 +155,7 @@ public abstract class DocumentServiceBase<TDocument, TDetail>(
     }
 
     /// <summary>Loads the document, runs the action and the audit entry in one transaction.</summary>
-    private async Task<TDetail> RunAsync(
+    protected async Task<TDetail> RunAsync(
         int id,
         string auditAction,
         Func<TDocument, Task<object?>> action,

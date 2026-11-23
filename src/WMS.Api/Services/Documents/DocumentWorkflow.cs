@@ -26,30 +26,51 @@ public enum DocumentAction
     Reject,
     Reopen,
     Complete,
-    Cancel
+    Cancel,
+    Pick,
+    Ship,
+    Receive
 }
 
 /// <summary>
-/// State machine shared by documents whose flow is
-/// Draft → PendingApproval → Approved → Completed (+ Rejected → Draft, Cancel).
+/// State machine shared by warehouse documents.
+/// Standard flow: Draft → PendingApproval → Approved → Completed (+ Rejected → Draft, Cancel).
+/// Transfer flow: ... Approved → Picked → InTransit → Received → Completed.
 /// Each method validates the current status, stamps who/when and throws 422 on an invalid transition.
 /// </summary>
 public sealed class DocumentWorkflow(ICurrentUser currentUser, TimeProvider timeProvider, IOptions<WarehouseOptions> options)
 {
     private DateTime Now => timeProvider.GetUtcNow().UtcDateTime;
 
-    public static IReadOnlyList<DocumentAction> AvailableActions(DocumentStatus status) => status switch
+    public static IReadOnlyList<DocumentAction> AvailableActions(DocumentStatus status, DocumentFlow flow = DocumentFlow.Standard) =>
+        (status, flow) switch
+        {
+            (DocumentStatus.Draft, _) => [DocumentAction.Edit, DocumentAction.Delete, DocumentAction.Submit, DocumentAction.Cancel],
+            (DocumentStatus.PendingApproval, _) => [DocumentAction.Approve, DocumentAction.Reject, DocumentAction.Cancel],
+            (DocumentStatus.Rejected, _) => [DocumentAction.Reopen, DocumentAction.Cancel],
+            (DocumentStatus.Approved, DocumentFlow.Standard) => [DocumentAction.Complete, DocumentAction.Cancel],
+            (DocumentStatus.Approved, DocumentFlow.Transfer) => [DocumentAction.Pick, DocumentAction.Cancel],
+            (DocumentStatus.Picked, DocumentFlow.Transfer) => [DocumentAction.Ship, DocumentAction.Cancel],
+            (DocumentStatus.InTransit, DocumentFlow.Transfer) => [DocumentAction.Receive],
+            (DocumentStatus.Received, DocumentFlow.Transfer) => [DocumentAction.Complete],
+            _ => []
+        };
+
+    /// <summary>Moves a document to <paramref name="status"/> through <paramref name="action"/> (used by flow-specific steps).</summary>
+    public void Advance(WarehouseDocument document, DocumentAction action, DocumentStatus status)
     {
-        DocumentStatus.Draft => [DocumentAction.Edit, DocumentAction.Delete, DocumentAction.Submit, DocumentAction.Cancel],
-        DocumentStatus.PendingApproval => [DocumentAction.Approve, DocumentAction.Reject, DocumentAction.Cancel],
-        DocumentStatus.Approved => [DocumentAction.Complete, DocumentAction.Cancel],
-        DocumentStatus.Rejected => [DocumentAction.Reopen, DocumentAction.Cancel],
-        _ => []
-    };
+        EnsureCan(document, action);
+        document.Status = status;
+        Stamp(document);
+    }
+
+    public int? CurrentUserId => currentUser.UserId;
+
+    public DateTime UtcNow => Now;
 
     public void EnsureCan(WarehouseDocument document, DocumentAction action)
     {
-        if (!AvailableActions(document.Status).Contains(action))
+        if (!AvailableActions(document.Status, document.Flow).Contains(action))
         {
             throw new BusinessRuleException(
                 $"Cannot {action.ToString().ToLowerInvariant()} document {document.DocumentNo} in status {document.Status}.");

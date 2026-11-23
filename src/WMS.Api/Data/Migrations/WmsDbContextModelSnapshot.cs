@@ -178,7 +178,7 @@ namespace WMS.Api.Data.Migrations
 
                     b.ToTable("GoodsIssues", null, t =>
                         {
-                            t.HasCheckConstraint("CK_GoodsIssues_Status", "[Status] IN ('Draft', 'PendingApproval', 'Approved', 'InProgress', 'Completed', 'Rejected', 'Cancelled')");
+                            t.HasCheckConstraint("CK_GoodsIssues_Status", "[Status] IN ('Draft', 'PendingApproval', 'Approved', 'InProgress', 'Completed', 'Rejected', 'Cancelled', 'Picked', 'InTransit', 'Received')");
                         });
                 });
 
@@ -334,7 +334,7 @@ namespace WMS.Api.Data.Migrations
 
                     b.ToTable("GoodsReceipts", null, t =>
                         {
-                            t.HasCheckConstraint("CK_GoodsReceipts_Status", "[Status] IN ('Draft', 'PendingApproval', 'Approved', 'InProgress', 'Completed', 'Rejected', 'Cancelled')");
+                            t.HasCheckConstraint("CK_GoodsReceipts_Status", "[Status] IN ('Draft', 'PendingApproval', 'Approved', 'InProgress', 'Completed', 'Rejected', 'Cancelled', 'Picked', 'InTransit', 'Received')");
                         });
                 });
 
@@ -395,6 +395,183 @@ namespace WMS.Api.Data.Migrations
                             t.HasCheckConstraint("CK_GoodsReceiptLines_Quantity_Positive", "[Quantity] > 0");
 
                             t.HasCheckConstraint("CK_GoodsReceiptLines_UnitCost_NonNegative", "[UnitCost] IS NULL OR [UnitCost] >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("WMS.Api.Models.Documents.StockTransfer", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("ApprovedBy")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CancellationReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("CancelledAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CancelledBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CompletedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DestinationWarehouseId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("DocumentNo")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime?>("PickedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("PickedBy")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("ReceivedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("ReceivedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("RejectedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("RejectedBy")
+                        .HasColumnType("int");
+
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTime?>("ShippedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("ShippedBy")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime?>("SubmittedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("SubmittedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<int>("WarehouseId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("Id", "WarehouseId");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("DocumentNo")
+                        .IsUnique();
+
+                    b.HasIndex("DestinationWarehouseId", "Status");
+
+                    b.HasIndex("WarehouseId", "Status");
+
+                    b.ToTable("StockTransfers", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_StockTransfers_Status", "[Status] IN ('Draft', 'PendingApproval', 'Approved', 'InProgress', 'Completed', 'Rejected', 'Cancelled', 'Picked', 'InTransit', 'Received')");
+                        });
+                });
+
+            modelBuilder.Entity("WMS.Api.Models.Documents.StockTransferLine", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("DestinationWarehouseId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("FromLocationId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)");
+
+                    b.Property<int>("StockTransferId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ToLocationId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("WarehouseId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("FromLocationId", "WarehouseId");
+
+                    b.HasIndex("ToLocationId", "DestinationWarehouseId");
+
+                    b.HasIndex("StockTransferId", "WarehouseId", "DestinationWarehouseId");
+
+                    b.ToTable("StockTransferLines", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_StockTransferLines_DifferentLocations", "[FromLocationId] <> [ToLocationId]");
+
+                            t.HasCheckConstraint("CK_StockTransferLines_Quantity_Positive", "[Quantity] > 0");
                         });
                 });
 
@@ -834,6 +1011,61 @@ namespace WMS.Api.Data.Migrations
                     b.Navigation("Product");
                 });
 
+            modelBuilder.Entity("WMS.Api.Models.Documents.StockTransfer", b =>
+                {
+                    b.HasOne("WMS.Api.Models.Warehouse", "DestinationWarehouse")
+                        .WithMany()
+                        .HasForeignKey("DestinationWarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WMS.Api.Models.Warehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("DestinationWarehouse");
+
+                    b.Navigation("Warehouse");
+                });
+
+            modelBuilder.Entity("WMS.Api.Models.Documents.StockTransferLine", b =>
+                {
+                    b.HasOne("WMS.Api.Models.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WMS.Api.Models.WarehouseLocation", "FromLocation")
+                        .WithMany()
+                        .HasForeignKey("FromLocationId", "WarehouseId")
+                        .HasPrincipalKey("Id", "WarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WMS.Api.Models.WarehouseLocation", "ToLocation")
+                        .WithMany()
+                        .HasForeignKey("ToLocationId", "DestinationWarehouseId")
+                        .HasPrincipalKey("Id", "WarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WMS.Api.Models.Documents.StockTransfer", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("StockTransferId", "WarehouseId", "DestinationWarehouseId")
+                        .HasPrincipalKey("Id", "WarehouseId", "DestinationWarehouseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("FromLocation");
+
+                    b.Navigation("Product");
+
+                    b.Navigation("ToLocation");
+                });
+
             modelBuilder.Entity("WMS.Api.Models.Inventory", b =>
                 {
                     b.HasOne("WMS.Api.Models.Product", "Product")
@@ -921,6 +1153,11 @@ namespace WMS.Api.Data.Migrations
                 });
 
             modelBuilder.Entity("WMS.Api.Models.Documents.GoodsReceipt", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("WMS.Api.Models.Documents.StockTransfer", b =>
                 {
                     b.Navigation("Lines");
                 });
