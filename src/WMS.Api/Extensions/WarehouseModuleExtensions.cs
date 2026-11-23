@@ -3,6 +3,7 @@ using WMS.Api.Authorization;
 using WMS.Api.Common;
 using WMS.Api.Middleware;
 using WMS.Api.Repositories;
+using WMS.Api.Services.Locations;
 using WMS.Api.Services.Warehouses;
 
 namespace WMS.Api.Extensions;
@@ -26,8 +27,16 @@ public static class WarehouseModuleExtensions
 
         services.AddAuthorizationBuilder().AddPermissionPolicies();
 
+        // Enums (e.g. LocationType) are exchanged as names: "Zone", "Rack", ...
+        services.Configure<Microsoft.AspNetCore.Mvc.JsonOptions>(options =>
+            options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
+
         services.AddScoped<IWarehouseRepository, WarehouseRepository>();
         services.AddScoped<IWarehouseService, WarehouseService>();
+
+        services.AddScoped<ILocationRepository, LocationRepository>();
+        services.AddScoped<ILocationService, LocationService>();
+        services.AddScoped<IWarehouseDependencyChecker, LocationWarehouseDependencyChecker>();
 
         return services;
     }
