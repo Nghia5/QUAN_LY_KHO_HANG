@@ -8,6 +8,7 @@ using WMS.Api.Middleware;
 using WMS.Api.Repositories;
 using WMS.Api.Services.Audit;
 using WMS.Api.Services.Documents;
+using WMS.Api.Services.GoodsIssues;
 using WMS.Api.Services.GoodsReceipts;
 using WMS.Api.Services.Inventories;
 using WMS.Api.Services.Locations;
@@ -67,6 +68,12 @@ public static class WarehouseModuleExtensions
         services.AddScoped<IGoodsReceiptService, GoodsReceiptService>();
         services.AddScoped<IWarehouseDependencyChecker, GoodsReceiptWarehouseDependencyChecker>();
         services.AddScoped<ILocationDependencyChecker, GoodsReceiptLocationDependencyChecker>();
+
+        services.AddScoped<IStockReservationService, StockReservationService>();
+        services.AddScoped<IGoodsIssueRepository, GoodsIssueRepository>();
+        services.AddScoped<IGoodsIssueService, GoodsIssueService>();
+        services.AddScoped<IWarehouseDependencyChecker, GoodsIssueWarehouseDependencyChecker>();
+        services.AddScoped<ILocationDependencyChecker, GoodsIssueLocationDependencyChecker>();
 
         return services;
     }

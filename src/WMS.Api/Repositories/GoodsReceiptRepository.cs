@@ -32,9 +32,7 @@ public interface IGoodsReceiptRepository
 
 public sealed class GoodsReceiptRepository(WmsDbContext dbContext) : IGoodsReceiptRepository
 {
-    /// <summary>Statuses that still can change stock (block deactivating warehouse/location).</summary>
-    public static readonly DocumentStatus[] OpenStatuses =
-        [DocumentStatus.Draft, DocumentStatus.PendingApproval, DocumentStatus.Approved, DocumentStatus.Rejected];
+    private static readonly DocumentStatus[] OpenStatuses = DocumentStatuses.Open;
 
     private static readonly IReadOnlyDictionary<string, Expression<Func<GoodsReceipt, object?>>> SortMap =
         QueryableExtensions.SortMap<GoodsReceipt>(

@@ -9,13 +9,18 @@ namespace WMS.Api.Services.Inventories;
 
 /// <summary>One quantity change of one inventory row (Product + Warehouse + Location).</summary>
 /// <param name="Quantity">Signed: positive for inbound types, negative for outbound types.</param>
+/// <param name="ReservedChange">
+/// Signed change of ReservedQuantity applied in the same statement, e.g. completing an approved
+/// issue consumes its reservation: Quantity = -5, ReservedChange = -5.
+/// </param>
 public sealed record StockChange(
     int ProductId,
     int WarehouseId,
     int LocationId,
     decimal Quantity,
     MovementType MovementType,
-    string? Note = null);
+    string? Note = null,
+    decimal ReservedChange = 0);
 
 /// <summary>Source document of a set of changes, e.g. ("GOODS_RECEIPT", 12, "GR-2026-0001").</summary>
 public sealed record StockReference(string ReferenceType, int? ReferenceId, string? ReferenceNo);
@@ -135,6 +140,13 @@ public sealed class StockLedger(
             .Select(inventory => new { inventory.Quantity, inventory.ReservedQuantity, inventory.AvailableQuantity })
             .SingleOrDefaultAsync(cancellationToken);
 
+        if (existing is not null && change.ReservedChange < 0 && existing.ReservedQuantity < -change.ReservedChange)
+        {
+            throw new ConflictException(
+                $"Reservation for product {change.ProductId} at location {change.LocationId} is missing " +
+                $"(reserved {existing.ReservedQuantity:0.###}, expected at least {-change.ReservedChange:0.###}).");
+        }
+
         if (existing is not null)
         {
             throw new BusinessRuleException(
@@ -143,7 +155,7 @@ public sealed class StockLedger(
                 $"requested {-change.Quantity:0.###}.");
         }
 
-        if (change.Quantity < 0)
+        if (change.Quantity < 0 || change.ReservedChange != 0)
         {
             throw new BusinessRuleException(
                 $"Product {change.ProductId} has no stock at location {change.LocationId} of warehouse {change.WarehouseId}.");
@@ -167,12 +179,15 @@ public sealed class StockLedger(
     {
         var rows = await dbContext.Database.SqlQuery<InventoryRow>($"""
             UPDATE [Inventories]
-            SET [Quantity] = [Quantity] + {change.Quantity}, [UpdatedAt] = SYSUTCDATETIME()
+            SET [Quantity] = [Quantity] + {change.Quantity},
+                [ReservedQuantity] = [ReservedQuantity] + {change.ReservedChange},
+                [UpdatedAt] = SYSUTCDATETIME()
             OUTPUT inserted.[Id] AS [Id], deleted.[Quantity] AS [QuantityBefore], inserted.[Quantity] AS [QuantityAfter]
             WHERE [ProductId] = {change.ProductId}
               AND [WarehouseId] = {change.WarehouseId}
               AND [LocationId] = {change.LocationId}
-              AND [Quantity] + {change.Quantity} >= [ReservedQuantity]
+              AND [ReservedQuantity] + {change.ReservedChange} >= 0
+              AND [Quantity] + {change.Quantity} >= [ReservedQuantity] + {change.ReservedChange}
             """).ToListAsync(cancellationToken);
 
         return rows.SingleOrDefault();

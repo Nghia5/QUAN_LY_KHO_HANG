@@ -48,15 +48,23 @@ public sealed class GoodsReceiptService(
     IStockLedger ledger,
     IAuditLogger audit,
     ICurrentUser currentUser,
-    TimeProvider timeProvider) : IGoodsReceiptService
+    TimeProvider timeProvider)
+    : DocumentServiceBase<GoodsReceipt, GoodsReceiptDetail>(dbContext, workflow, audit, currentUser), IGoodsReceiptService
 {
-    private const string AuditEntity = "GoodsReceipt";
+    protected override string AuditEntity => "GoodsReceipt";
+
+    protected override string DisplayName => "Goods receipt";
+
+    protected override string ApprovePermission => Permissions.GoodsReceiptApprove;
+
+    protected override Task<GoodsReceipt?> LoadAsync(int id, CancellationToken cancellationToken) =>
+        repository.FindAsync(id, cancellationToken);
 
     public Task<PagedResult<GoodsReceiptSummary>> SearchAsync(GoodsReceiptQuery query, CancellationToken cancellationToken) =>
         repository.SearchAsync(query, cancellationToken);
 
-    public async Task<GoodsReceiptDetail> GetAsync(int id, CancellationToken cancellationToken) =>
-        await repository.GetDetailAsync(id, cancellationToken) ?? throw new NotFoundException("Goods receipt", id);
+    public override async Task<GoodsReceiptDetail> GetAsync(int id, CancellationToken cancellationToken) =>
+        await repository.GetDetailAsync(id, cancellationToken) ?? throw new NotFoundException(DisplayName, id);
 
     public async Task<GoodsReceiptDetail> CreateAsync(CreateGoodsReceiptRequest request, CancellationToken cancellationToken)
     {
@@ -69,13 +77,13 @@ public sealed class GoodsReceiptService(
             WarehouseId = request.WarehouseId
         };
         Apply(receipt, request, receiptDate);
-        workflow.Created(receipt);
+        Workflow.Created(receipt);
 
-        await using (var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken))
+        await using (var transaction = await DbContext.Database.BeginTransactionAsync(cancellationToken))
         {
             repository.Add(receipt);
             await SaveAsync(cancellationToken); // receipt first, to know its Id for the audit entry
-            audit.Log(AuditEntity, receipt.Id, "CREATED", new { receipt.DocumentNo, LineCount = receipt.Lines.Count });
+            Audit.Log(AuditEntity, receipt.Id, "CREATED", new { receipt.DocumentNo, LineCount = receipt.Lines.Count });
             await SaveAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }
@@ -86,71 +94,29 @@ public sealed class GoodsReceiptService(
     public async Task<GoodsReceiptDetail> UpdateAsync(int id, UpdateGoodsReceiptRequest request, CancellationToken cancellationToken)
     {
         var receipt = await FindAsync(id, cancellationToken);
-        workflow.EnsureCan(receipt, DocumentAction.Edit);
+        Workflow.EnsureCan(receipt, DocumentAction.Edit);
 
         var receiptDate = request.ReceiptDate ?? receipt.ReceiptDate;
         await ValidateAsync(receipt.WarehouseId, receiptDate, request.Lines, cancellationToken);
 
         receipt.Lines.Clear(); // lines of a draft are replaced as a whole
         Apply(receipt, request, receiptDate);
-        workflow.Stamp(receipt);
-        audit.Log(AuditEntity, receipt.Id, "UPDATED", new { receipt.DocumentNo, LineCount = receipt.Lines.Count });
+        Workflow.Stamp(receipt);
+        Audit.Log(AuditEntity, receipt.Id, "UPDATED", new { receipt.DocumentNo, LineCount = receipt.Lines.Count });
         await SaveAsync(cancellationToken);
 
         return await GetAsync(id, cancellationToken);
     }
 
-    public async Task DeleteAsync(int id, CancellationToken cancellationToken)
+    protected override Task BeforeSubmitAsync(GoodsReceipt receipt, CancellationToken cancellationToken) =>
+        ValidateAsync(receipt.WarehouseId, receipt.ReceiptDate, receipt.Lines.Select(ToRequest).ToList(), cancellationToken);
+
+    // Master data may have changed since approval (product/location deactivated...): re-check.
+    protected override Task BeforeCompleteAsync(GoodsReceipt receipt, CancellationToken cancellationToken) =>
+        ValidateAsync(receipt.WarehouseId, receipt.ReceiptDate, receipt.Lines.Select(ToRequest).ToList(), cancellationToken);
+
+    protected override async Task<object?> OnCompletingAsync(GoodsReceipt receipt, CancellationToken cancellationToken)
     {
-        var receipt = await FindAsync(id, cancellationToken);
-        workflow.EnsureCan(receipt, DocumentAction.Delete);
-
-        audit.Log(AuditEntity, receipt.Id, "DELETED", new { receipt.DocumentNo });
-        repository.Remove(receipt);
-        await SaveAsync(cancellationToken);
-    }
-
-    public async Task<GoodsReceiptDetail> SubmitAsync(int id, CancellationToken cancellationToken)
-    {
-        var receipt = await FindAsync(id, cancellationToken);
-        await ValidateAsync(receipt.WarehouseId, receipt.ReceiptDate, receipt.Lines.Select(ToRequest).ToList(), cancellationToken);
-        return await TransitionAsync(receipt, "SUBMITTED", workflow.Submit, null, cancellationToken);
-    }
-
-    public async Task<GoodsReceiptDetail> ApproveAsync(int id, CancellationToken cancellationToken) =>
-        await TransitionAsync(await FindAsync(id, cancellationToken), "APPROVED", workflow.Approve, null, cancellationToken);
-
-    public async Task<GoodsReceiptDetail> RejectAsync(int id, string reason, CancellationToken cancellationToken) =>
-        await TransitionAsync(await FindAsync(id, cancellationToken), "REJECTED", r => workflow.Reject(r, reason), reason, cancellationToken);
-
-    public async Task<GoodsReceiptDetail> ReopenAsync(int id, CancellationToken cancellationToken) =>
-        await TransitionAsync(await FindAsync(id, cancellationToken), "REOPENED", workflow.Reopen, null, cancellationToken);
-
-    public async Task<GoodsReceiptDetail> CancelAsync(int id, string reason, CancellationToken cancellationToken)
-    {
-        var receipt = await FindAsync(id, cancellationToken);
-        if (receipt.Status == DocumentStatus.Approved && !currentUser.HasPermission(Permissions.GoodsReceiptApprove))
-        {
-            throw new ForbiddenException($"Cancelling an approved receipt requires {Permissions.GoodsReceiptApprove}.");
-        }
-
-        return await TransitionAsync(receipt, "CANCELLED", r => workflow.Cancel(r, reason), reason, cancellationToken);
-    }
-
-    public async Task<GoodsReceiptDetail> CompleteAsync(int id, CancellationToken cancellationToken)
-    {
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
-
-        var receipt = await FindAsync(id, cancellationToken);
-        workflow.Complete(receipt);
-
-        // Master data may have changed since approval (product/location deactivated...): re-check.
-        await ValidateAsync(receipt.WarehouseId, receipt.ReceiptDate, receipt.Lines.Select(ToRequest).ToList(), cancellationToken);
-
-        // Saving the status first takes the row lock and checks RowVersion, so a second
-        // concurrent "complete" of the same receipt fails here instead of posting stock twice.
-        await SaveAsync(cancellationToken);
-
         var movements = await ledger.ApplyAsync(
             receipt.Lines
                 .Select(line => new StockChange(
@@ -164,29 +130,11 @@ public sealed class GoodsReceiptService(
             new StockReference(DocumentTypes.GoodsReceipt, receipt.Id, receipt.DocumentNo),
             cancellationToken);
 
-        audit.Log(AuditEntity, receipt.Id, "COMPLETED", new
+        return new
         {
-            receipt.DocumentNo,
             TotalQuantity = receipt.Lines.Sum(line => line.Quantity),
             MovementIds = movements.Select(movement => movement.Id)
-        });
-        await SaveAsync(cancellationToken);
-
-        await transaction.CommitAsync(cancellationToken);
-        return await GetAsync(id, cancellationToken);
-    }
-
-    private async Task<GoodsReceiptDetail> TransitionAsync(
-        GoodsReceipt receipt,
-        string action,
-        Action<GoodsReceipt> transition,
-        string? reason,
-        CancellationToken cancellationToken)
-    {
-        transition(receipt);
-        audit.Log(AuditEntity, receipt.Id, action, new { receipt.DocumentNo, Status = receipt.Status.ToString(), Reason = reason });
-        await SaveAsync(cancellationToken);
-        return await GetAsync(receipt.Id, cancellationToken);
+        };
     }
 
     private static void Apply(GoodsReceipt receipt, IGoodsReceiptPayload request, DateOnly receiptDate)
@@ -219,30 +167,8 @@ public sealed class GoodsReceiptService(
         IReadOnlyList<GoodsReceiptLineRequest> lines,
         CancellationToken cancellationToken)
     {
-        var warehouse = await dbContext.Set<Warehouse>()
-            .AsNoTracking()
-            .Where(w => w.Id == warehouseId)
-            .Select(w => new { w.Code, w.IsActive })
-            .SingleOrDefaultAsync(cancellationToken)
-            ?? throw new BusinessRuleException($"Warehouse {warehouseId} does not exist.");
-        if (!warehouse.IsActive)
-        {
-            throw new BusinessRuleException($"Warehouse '{warehouse.Code}' is inactive.");
-        }
-
-        var productIds = lines.Select(line => line.ProductId).Distinct().ToList();
-        var products = await dbContext.Set<Product>()
-            .AsNoTracking()
-            .Where(p => productIds.Contains(p.Id))
-            .Select(p => new { p.Id, p.Sku, p.IsActive })
-            .ToDictionaryAsync(p => p.Id, cancellationToken);
-
-        var locationIds = lines.Select(line => line.LocationId).Distinct().ToList();
-        var locations = await dbContext.Set<WarehouseLocation>()
-            .AsNoTracking()
-            .Where(l => locationIds.Contains(l.Id) && l.WarehouseId == warehouseId)
-            .Select(l => new { l.Id, l.Code, l.Type, l.IsActive })
-            .ToDictionaryAsync(l => l.Id, cancellationToken);
+        var context = await DocumentLineValidator.LoadAsync(
+            DbContext, warehouseId, lines.Select(line => (line.ProductId, line.LocationId)).ToList(), cancellationToken);
 
         var errors = new List<string>();
         for (var index = 0; index < lines.Count; index++)
@@ -250,27 +176,8 @@ public sealed class GoodsReceiptService(
             var line = lines[index];
             var prefix = $"Line {index + 1}:";
 
-            if (!products.TryGetValue(line.ProductId, out var product))
-            {
-                errors.Add($"{prefix} product {line.ProductId} does not exist.");
-            }
-            else if (!product.IsActive)
-            {
-                errors.Add($"{prefix} product '{product.Sku}' is inactive.");
-            }
-
-            if (!locations.TryGetValue(line.LocationId, out var location))
-            {
-                errors.Add($"{prefix} location {line.LocationId} does not belong to warehouse '{warehouse.Code}'.");
-            }
-            else if (location.Type != LocationType.Bin)
-            {
-                errors.Add($"{prefix} '{location.Code}' is a {location.Type}; goods can only be received into a Bin.");
-            }
-            else if (!location.IsActive)
-            {
-                errors.Add($"{prefix} location '{location.Code}' is inactive.");
-            }
+            context.CheckProduct(errors, prefix, line.ProductId, requireActive: true);
+            context.CheckBin(errors, prefix, line.LocationId, requireActive: true, "goods can only be received into a Bin");
 
             if (line.ManufactureDate is { } manufactured && manufactured > receiptDate)
             {
@@ -283,32 +190,11 @@ public sealed class GoodsReceiptService(
             }
         }
 
-        var duplicates = lines
-            .Select((line, index) => (Key: (line.ProductId, line.LocationId, Batch: NormalizeBatch(line.BatchCode)), Number: index + 1))
-            .GroupBy(item => item.Key)
-            .Where(group => group.Count() > 1)
-            .Select(group => $"Lines {string.Join(", ", group.Select(item => item.Number))} repeat the same product, location and batch; merge them.");
-        errors.AddRange(duplicates);
+        errors.AddRange(DocumentLineValidator.Duplicates(
+            lines.Select(line => (object)(line.ProductId, line.LocationId, NormalizeBatch(line.BatchCode))).ToList(),
+            "repeat the same product, location and batch; merge them."));
 
-        if (errors.Count > 0)
-        {
-            throw new BusinessRuleException(string.Join(" ", errors));
-        }
-    }
-
-    private async Task<GoodsReceipt> FindAsync(int id, CancellationToken cancellationToken) =>
-        await repository.FindAsync(id, cancellationToken) ?? throw new NotFoundException("Goods receipt", id);
-
-    private async Task SaveAsync(CancellationToken cancellationToken)
-    {
-        try
-        {
-            await dbContext.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            throw new ConflictException("The receipt was changed by someone else. Reload it and try again.");
-        }
+        DocumentLineValidator.ThrowIfAny(errors);
     }
 
     private static GoodsReceiptLineRequest ToRequest(GoodsReceiptLine line) => new()
