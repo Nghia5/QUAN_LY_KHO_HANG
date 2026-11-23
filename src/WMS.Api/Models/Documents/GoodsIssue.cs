@@ -37,7 +37,12 @@ public sealed class GoodsIssueLine
     /// <summary>Always &gt; 0.</summary>
     public decimal Quantity { get; set; }
 
+    /// <summary>Lot to issue; null = automatic FEFO allocation (expired lots are skipped).</summary>
+    public int? BatchId { get; set; }
+
     public string? Note { get; set; }
+
+    public Batch? Batch { get; set; }
 
     public Product? Product { get; set; }
 

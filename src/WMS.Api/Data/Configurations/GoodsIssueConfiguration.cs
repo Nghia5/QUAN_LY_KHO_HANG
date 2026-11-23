@@ -38,6 +38,13 @@ public sealed class GoodsIssueLineConfiguration : IEntityTypeConfiguration<Goods
 
         builder.HasIndex(line => line.ProductId);
 
+        // A chosen lot must be a lot of the line's product.
+        builder.HasOne(line => line.Batch)
+            .WithMany()
+            .HasForeignKey(line => new { line.BatchId, line.ProductId })
+            .HasPrincipalKey(batch => new { batch.Id, batch.ProductId })
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasOne(line => line.Product)
             .WithMany()
             .HasForeignKey(line => line.ProductId)

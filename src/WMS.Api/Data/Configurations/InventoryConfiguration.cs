@@ -23,6 +23,9 @@ public sealed class InventoryConfiguration : IEntityTypeConfiguration<Inventory>
 
         builder.HasKey(inventory => inventory.Id);
 
+        // Target of InventoryLot's composite FK (lot product = inventory product).
+        builder.HasAlternateKey(inventory => new { inventory.Id, inventory.ProductId });
+
         builder.Property(inventory => inventory.Quantity)
             .HasPrecision(QuantityPrecision, QuantityScale)
             .HasDefaultValue(0m);

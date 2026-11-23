@@ -36,6 +36,9 @@ public sealed class StockMovement
 
     public int LocationId { get; set; }
 
+    /// <summary>Lot moved by this entry; null for stock without lot information.</summary>
+    public int? BatchId { get; set; }
+
     public MovementType MovementType { get; set; }
 
     /// <summary>Signed change: positive for inbound, negative for outbound. Never 0.</summary>
@@ -65,4 +68,6 @@ public sealed class StockMovement
     public Warehouse? Warehouse { get; set; }
 
     public WarehouseLocation? Location { get; set; }
+
+    public Batch? Batch { get; set; }
 }

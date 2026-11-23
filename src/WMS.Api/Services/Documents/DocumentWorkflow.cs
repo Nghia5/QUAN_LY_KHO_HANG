@@ -20,6 +20,9 @@ public sealed class WarehouseOptions
     /// when false, submitting an adjustment applies it immediately.
     /// </summary>
     public bool RequireAdjustmentApproval { get; set; } = true;
+
+    /// <summary>A lot is NEAR_EXPIRY when 0 &lt;= days to expiry &lt;= this value (spec section 7).</summary>
+    public int NearExpiryDays { get; set; } = 30;
 }
 
 /// <summary>Workflow actions; also returned to the UI as the actions currently allowed.</summary>

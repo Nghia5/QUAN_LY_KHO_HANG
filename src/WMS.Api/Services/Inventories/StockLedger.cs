@@ -15,6 +15,11 @@ namespace WMS.Api.Services.Inventories;
 /// Signed change of ReservedQuantity applied in the same statement, e.g. completing an approved
 /// issue consumes its reservation: Quantity = -5, ReservedChange = -5.
 /// </param>
+/// <param name="BatchId">
+/// Lot affected. Inbound: the quantity is added to this lot. Outbound: taken from this lot.
+/// Null outbound = automatic FEFO allocation over the row's lots, then stock without lot
+/// (expired lots are skipped for <see cref="MovementType.Issue"/>). Null inbound = stock without lot.
+/// </param>
 public sealed record StockChange(
     int ProductId,
     int WarehouseId,
@@ -22,7 +27,11 @@ public sealed record StockChange(
     decimal Quantity,
     MovementType MovementType,
     string? Note = null,
-    decimal ReservedChange = 0);
+    decimal ReservedChange = 0,
+    int? BatchId = null);
+
+/// <summary>A change and the movements it produced (one per lot touched).</summary>
+public sealed record AppliedStockChange(StockChange Change, IReadOnlyList<StockMovement> Movements);
 
 /// <summary>Source document of a set of changes, e.g. ("GOODS_RECEIPT", 12, "GR-2026-0001").</summary>
 public sealed record StockReference(string ReferenceType, int? ReferenceId, string? ReferenceNo);
@@ -43,6 +52,12 @@ public interface IStockLedger
         IReadOnlyCollection<StockChange> changes,
         StockReference reference,
         CancellationToken cancellationToken);
+
+    /// <summary>Same as <see cref="ApplyAsync"/>, but returns the movements of each change (lot allocation).</summary>
+    Task<IReadOnlyList<AppliedStockChange>> ApplyDetailedAsync(
+        IReadOnlyCollection<StockChange> changes,
+        StockReference reference,
+        CancellationToken cancellationToken);
 }
 
 public sealed class StockLedger(
@@ -51,6 +66,12 @@ public sealed class StockLedger(
     TimeProvider timeProvider) : IStockLedger
 {
     public async Task<IReadOnlyList<StockMovement>> ApplyAsync(
+        IReadOnlyCollection<StockChange> changes,
+        StockReference reference,
+        CancellationToken cancellationToken) =>
+        (await ApplyDetailedAsync(changes, reference, cancellationToken)).SelectMany(applied => applied.Movements).ToList();
+
+    public async Task<IReadOnlyList<AppliedStockChange>> ApplyDetailedAsync(
         IReadOnlyCollection<StockChange> changes,
         StockReference reference,
         CancellationToken cancellationToken)
@@ -70,7 +91,9 @@ public sealed class StockLedger(
             ? await dbContext.Database.BeginTransactionAsync(cancellationToken)
             : null;
 
-        var movements = new List<StockMovement>(changes.Count);
+        await EnsureBatchesMatchProductsAsync(changes, cancellationToken);
+
+        var results = new List<AppliedStockChange>(changes.Count);
         var userId = currentUser.UserId;
         var now = timeProvider.GetUtcNow().UtcDateTime;
 
@@ -78,38 +101,176 @@ public sealed class StockLedger(
         foreach (var change in changes.OrderBy(c => c.ProductId).ThenBy(c => c.WarehouseId).ThenBy(c => c.LocationId))
         {
             var row = await ApplyToInventoryAsync(change, cancellationToken);
-            movements.Add(new StockMovement
+            var allocations = await ApplyToLotsAsync(change, row, cancellationToken);
+
+            // One movement per lot touched; Before/After chain through the locked row.
+            var running = row.QuantityBefore;
+            var movements = allocations.Select(allocation =>
             {
-                InventoryId = row.Id,
-                ProductId = change.ProductId,
-                WarehouseId = change.WarehouseId,
-                LocationId = change.LocationId,
-                MovementType = change.MovementType,
-                Quantity = change.Quantity,
-                QuantityBefore = row.QuantityBefore,
-                QuantityAfter = row.QuantityAfter,
-                ReferenceType = reference.ReferenceType,
-                ReferenceId = reference.ReferenceId,
-                ReferenceNo = reference.ReferenceNo,
-                Note = change.Note,
-                CreatedBy = userId,
-                CreatedAt = now
-            });
+                var movement = new StockMovement
+                {
+                    InventoryId = row.Id,
+                    ProductId = change.ProductId,
+                    WarehouseId = change.WarehouseId,
+                    LocationId = change.LocationId,
+                    BatchId = allocation.BatchId,
+                    MovementType = change.MovementType,
+                    Quantity = allocation.Quantity,
+                    QuantityBefore = running,
+                    QuantityAfter = running + allocation.Quantity,
+                    ReferenceType = reference.ReferenceType,
+                    ReferenceId = reference.ReferenceId,
+                    ReferenceNo = reference.ReferenceNo,
+                    Note = change.Note,
+                    CreatedBy = userId,
+                    CreatedAt = now
+                };
+                running += allocation.Quantity;
+                return movement;
+            }).ToList();
+
+            results.Add(new AppliedStockChange(change, movements));
         }
 
         // Checked AFTER the updates: if a stocktake snapshot is being taken concurrently, our UPDATE
         // waited for it, so its lines are visible now and this change is rolled back.
         await EnsureNotBeingCountedAsync(changes, reference, cancellationToken);
 
-        dbContext.Set<StockMovement>().AddRange(movements);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        // Inserted one by one so identity order = ledger order (the Before/After chain relies on it).
+        foreach (var movement in results.SelectMany(result => result.Movements))
+        {
+            dbContext.Set<StockMovement>().Add(movement);
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
 
         if (transaction is not null)
         {
             await transaction.CommitAsync(cancellationToken);
         }
 
-        return movements;
+        return results;
+    }
+
+    /// <summary>
+    /// Applies the change to the lots of the (already updated and locked) inventory row and returns
+    /// the signed quantity per lot (null = stock without lot). The sum always equals change.Quantity.
+    /// </summary>
+    private async Task<List<(int? BatchId, decimal Quantity)>> ApplyToLotsAsync(
+        StockChange change,
+        InventoryRow row,
+        CancellationToken cancellationToken)
+    {
+        if (change.BatchId is { } batchId)
+        {
+            if (change.Quantity > 0)
+            {
+                var updated = await dbContext.Database.ExecuteSqlAsync($"""
+                    UPDATE [InventoryLots] SET [Quantity] = [Quantity] + {change.Quantity}, [UpdatedAt] = SYSUTCDATETIME()
+                    WHERE [InventoryId] = {row.Id} AND [BatchId] = {batchId}
+                    """, cancellationToken);
+                if (updated == 0)
+                {
+                    await dbContext.Database.ExecuteSqlAsync($"""
+                        INSERT INTO [InventoryLots] ([InventoryId], [BatchId], [ProductId], [Quantity], [UpdatedAt])
+                        VALUES ({row.Id}, {batchId}, {change.ProductId}, {change.Quantity}, SYSUTCDATETIME())
+                        """, cancellationToken);
+                }
+            }
+            else
+            {
+                var taken = await dbContext.Database.ExecuteSqlAsync($"""
+                    UPDATE [InventoryLots] SET [Quantity] = [Quantity] + {change.Quantity}, [UpdatedAt] = SYSUTCDATETIME()
+                    WHERE [InventoryId] = {row.Id} AND [BatchId] = {batchId} AND [Quantity] + {change.Quantity} >= 0
+                    """, cancellationToken);
+                if (taken == 0)
+                {
+                    var inLot = await dbContext.Set<InventoryLot>()
+                        .Where(lot => lot.InventoryId == row.Id && lot.BatchId == batchId)
+                        .Select(lot => (decimal?)lot.Quantity)
+                        .SingleOrDefaultAsync(cancellationToken) ?? 0m;
+                    throw new BusinessRuleException(
+                        $"Batch {batchId} has only {inLot:0.###} at location {change.LocationId}; requested {-change.Quantity:0.###}.");
+                }
+            }
+
+            return [(batchId, change.Quantity)];
+        }
+
+        if (change.Quantity > 0)
+        {
+            return [(null, change.Quantity)];
+        }
+
+        // Outbound without a lot: FEFO over the lots of this row, then the stock without lot.
+        var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+        var lots = await dbContext.Set<InventoryLot>()
+            .Where(lot => lot.InventoryId == row.Id && lot.Quantity > 0)
+            .Select(lot => new { lot.Id, lot.BatchId, lot.Quantity, lot.Batch!.ExpiryDate })
+            .ToListAsync(cancellationToken);
+
+        var untracked = row.QuantityBefore - lots.Sum(lot => lot.Quantity);
+        var skipExpired = change.MovementType == MovementType.Issue;
+        var candidates = lots
+            .Where(lot => !skipExpired || lot.ExpiryDate is null || lot.ExpiryDate >= today)
+            .OrderBy(lot => lot.ExpiryDate is null)
+            .ThenBy(lot => lot.ExpiryDate)
+            .ThenBy(lot => lot.BatchId);
+
+        var remaining = -change.Quantity;
+        var allocations = new List<(int? BatchId, decimal Quantity)>();
+        foreach (var lot in candidates)
+        {
+            if (remaining == 0)
+            {
+                break;
+            }
+
+            var take = Math.Min(lot.Quantity, remaining);
+            await dbContext.Database.ExecuteSqlAsync($"""
+                UPDATE [InventoryLots] SET [Quantity] = [Quantity] - {take}, [UpdatedAt] = SYSUTCDATETIME()
+                WHERE [Id] = {lot.Id} AND [Quantity] >= {take}
+                """, cancellationToken);
+            allocations.Add((lot.BatchId, -take));
+            remaining -= take;
+        }
+
+        if (remaining > 0 && untracked > 0)
+        {
+            var take = Math.Min(untracked, remaining);
+            allocations.Add((null, -take));
+            remaining -= take;
+        }
+
+        if (remaining > 0)
+        {
+            var expired = lots.Where(lot => lot.ExpiryDate < today).Sum(lot => lot.Quantity);
+            throw new BusinessRuleException(
+                $"Product {change.ProductId} at location {change.LocationId}: {expired:0.###} of the stock is expired " +
+                $"and cannot be issued; requested {-change.Quantity:0.###}.");
+        }
+
+        return allocations;
+    }
+
+    /// <summary>A lot can only be used for its own product.</summary>
+    private async Task EnsureBatchesMatchProductsAsync(IReadOnlyCollection<StockChange> changes, CancellationToken cancellationToken)
+    {
+        var batchIds = changes.Where(change => change.BatchId is not null).Select(change => change.BatchId!.Value).Distinct().ToList();
+        if (batchIds.Count == 0)
+        {
+            return;
+        }
+
+        var products = await dbContext.Set<Batch>()
+            .Where(batch => batchIds.Contains(batch.Id))
+            .ToDictionaryAsync(batch => batch.Id, batch => batch.ProductId, cancellationToken);
+
+        var wrong = changes.FirstOrDefault(change =>
+            change.BatchId is { } id && (!products.TryGetValue(id, out var productId) || productId != change.ProductId));
+        if (wrong is not null)
+        {
+            throw new BusinessRuleException($"Batch {wrong.BatchId} does not exist for product {wrong.ProductId}.");
+        }
     }
 
     /// <summary>Statuses in which a stocktake freezes the stock of its counted locations (spec 5.3).</summary>

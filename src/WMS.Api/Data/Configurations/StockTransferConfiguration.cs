@@ -51,6 +51,13 @@ public sealed class StockTransferLineConfiguration : IEntityTypeConfiguration<St
 
         builder.HasIndex(line => line.ProductId);
 
+        builder.OwnsMany(line => line.ShippedLots, lots =>
+        {
+            lots.ToJson();
+            lots.Property(lot => lot.Quantity)
+                .HasPrecision(InventoryConfiguration.QuantityPrecision, InventoryConfiguration.QuantityScale);
+        });
+
         builder.HasOne(line => line.Product)
             .WithMany()
             .HasForeignKey(line => line.ProductId)

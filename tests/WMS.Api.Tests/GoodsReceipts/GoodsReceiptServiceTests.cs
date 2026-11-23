@@ -74,6 +74,7 @@ public sealed class GoodsReceiptServiceTests(GoodsReceiptFixture fixture) : ICla
             new DocumentNumberGenerator(context, time),
             new DocumentWorkflow(user, time, Options.Create(new WarehouseOptions())),
             new StockLedger(context, user, time),
+            TestServices.Batches(context, user),
             auditOverride ?? new AuditLogger(context, user, time),
             user,
             time);
@@ -350,6 +351,7 @@ public sealed class GoodsReceiptServiceTests(GoodsReceiptFixture fixture) : ICla
             context, new GoodsReceiptRepository(context), new DocumentNumberGenerator(context, TimeProvider.System),
             new DocumentWorkflow(clerkWithoutApprove, TimeProvider.System, Options.Create(new WarehouseOptions())),
             new StockLedger(context, clerkWithoutApprove, TimeProvider.System),
+            TestServices.Batches(context, clerkWithoutApprove),
             new AuditLogger(context, clerkWithoutApprove, TimeProvider.System), clerkWithoutApprove, TimeProvider.System);
 
         await Assert.ThrowsAsync<ForbiddenException>(() => service.CancelAsync(approved.Id, "no longer needed", default));

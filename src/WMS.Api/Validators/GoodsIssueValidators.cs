@@ -14,6 +14,7 @@ public sealed class GoodsIssueLineRequestValidator : AbstractValidator<GoodsIssu
             .LessThan(GoodsReceiptLineRequestValidator.MaxQuantity)
             .Must(quantity => decimal.Round(quantity, 3) == quantity)
             .WithMessage("'Quantity' supports at most 3 decimal places.");
+        RuleFor(line => line.BatchId).GreaterThan(0);
         RuleFor(line => line.Note).MaximumLength(500);
     }
 }

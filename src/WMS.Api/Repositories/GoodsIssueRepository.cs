@@ -143,6 +143,8 @@ public sealed class GoodsIssueRepository(WmsDbContext dbContext) : IGoodsIssueRe
                             .Where(inv => inv.ProductId == line.ProductId && inv.LocationId == line.LocationId)
                             .Select(inv => inv.AvailableQuantity)
                             .FirstOrDefault(),
+                        line.BatchId,
+                        line.Batch != null ? line.Batch.BatchCode : null,
                         line.Note))
                     .ToList()
             })

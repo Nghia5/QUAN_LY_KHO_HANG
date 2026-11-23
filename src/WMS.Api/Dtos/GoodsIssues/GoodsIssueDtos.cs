@@ -14,6 +14,9 @@ public sealed record GoodsIssueLineRequest
 
     public decimal Quantity { get; init; }
 
+    /// <summary>Optional lot to issue; when omitted, lots are chosen by FEFO (expired lots skipped).</summary>
+    public int? BatchId { get; init; }
+
     public string? Note { get; init; }
 }
 
@@ -112,6 +115,8 @@ public sealed record GoodsIssueLineResponse(
     string LocationCode,
     decimal Quantity,
     decimal AvailableQuantity,
+    int? BatchId,
+    string? BatchCode,
     string? Note);
 
 public sealed record GoodsIssueDetail(

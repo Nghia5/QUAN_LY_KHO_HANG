@@ -9,6 +9,7 @@ using WMS.Api.Models;
 using WMS.Api.Models.Documents;
 using WMS.Api.Repositories;
 using WMS.Api.Services.Audit;
+using WMS.Api.Services.Batches;
 using WMS.Api.Services.Documents;
 using WMS.Api.Services.Inventories;
 
@@ -46,6 +47,7 @@ public sealed class GoodsReceiptService(
     IDocumentNumberGenerator numberGenerator,
     DocumentWorkflow workflow,
     IStockLedger ledger,
+    IBatchService batches,
     IAuditLogger audit,
     ICurrentUser currentUser,
     TimeProvider timeProvider)
@@ -117,16 +119,26 @@ public sealed class GoodsReceiptService(
 
     protected override async Task<object?> OnCompletingAsync(GoodsReceipt receipt, CancellationToken cancellationToken)
     {
+        // Lines with a batch code create (or reuse) the batch and put the quantity into that lot.
+        var changes = new List<StockChange>(receipt.Lines.Count);
+        foreach (var line in receipt.Lines)
+        {
+            int? batchId = line.BatchCode is null
+                ? null
+                : (await batches.EnsureAsync(line.ProductId, line.BatchCode, line.ManufactureDate, line.ExpiryDate, cancellationToken)).Id;
+
+            changes.Add(new StockChange(
+                line.ProductId,
+                line.WarehouseId,
+                line.LocationId,
+                line.Quantity,
+                MovementType.Receipt,
+                line.BatchCode is null ? line.Note : $"Batch {line.BatchCode}",
+                BatchId: batchId));
+        }
+
         var movements = await ledger.ApplyAsync(
-            receipt.Lines
-                .Select(line => new StockChange(
-                    line.ProductId,
-                    line.WarehouseId,
-                    line.LocationId,
-                    line.Quantity,
-                    MovementType.Receipt,
-                    line.BatchCode is null ? line.Note : $"Batch {line.BatchCode}"))
-                .ToList(),
+            changes,
             new StockReference(DocumentTypes.GoodsReceipt, receipt.Id, receipt.DocumentNo),
             cancellationToken);
 
@@ -187,6 +199,14 @@ public sealed class GoodsReceiptService(
             if (line.ExpiryDate is { } expiry && expiry <= receiptDate)
             {
                 errors.Add($"{prefix} goods are already expired on the receipt date ({expiry:yyyy-MM-dd}).");
+            }
+
+            // An existing batch keeps its dates: a different date means a different (wrong) batch code.
+            if (!string.IsNullOrWhiteSpace(line.BatchCode)
+                && await batches.CheckDatesAsync(line.ProductId, line.BatchCode, line.ManufactureDate, line.ExpiryDate, cancellationToken)
+                    is { } conflict)
+            {
+                errors.Add($"{prefix} {conflict}");
             }
         }
 

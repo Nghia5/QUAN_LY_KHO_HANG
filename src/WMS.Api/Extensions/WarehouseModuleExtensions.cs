@@ -7,6 +7,7 @@ using WMS.Api.Data.Interceptors;
 using WMS.Api.Middleware;
 using WMS.Api.Repositories;
 using WMS.Api.Services.Audit;
+using WMS.Api.Services.Batches;
 using WMS.Api.Services.Documents;
 using WMS.Api.Services.GoodsIssues;
 using WMS.Api.Services.GoodsReceipts;
@@ -87,6 +88,9 @@ public static class WarehouseModuleExtensions
         services.AddScoped<IStocktakeService, StocktakeService>();
         services.AddScoped<IWarehouseDependencyChecker, StocktakeWarehouseDependencyChecker>();
         services.AddScoped<ILocationDependencyChecker, StocktakeLocationDependencyChecker>();
+
+        services.AddScoped<IBatchRepository, BatchRepository>();
+        services.AddScoped<IBatchService, BatchService>();
 
         services.AddScoped<IStockAdjustmentRepository, StockAdjustmentRepository>();
         services.AddScoped<IStockAdjustmentService, StockAdjustmentService>();

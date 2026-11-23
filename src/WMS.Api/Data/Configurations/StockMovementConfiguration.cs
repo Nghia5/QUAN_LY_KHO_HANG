@@ -72,6 +72,12 @@ public sealed class StockMovementConfiguration : IEntityTypeConfiguration<StockM
             .HasForeignKey(movement => movement.WarehouseId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasIndex(movement => movement.BatchId);
+        builder.HasOne(movement => movement.Batch)
+            .WithMany()
+            .HasForeignKey(movement => movement.BatchId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasOne(movement => movement.Location)
             .WithMany()
             .HasForeignKey(movement => new { movement.LocationId, movement.WarehouseId })

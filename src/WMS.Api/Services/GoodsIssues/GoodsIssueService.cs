@@ -135,7 +135,8 @@ public sealed class GoodsIssueService(
                     -line.Quantity,
                     MovementType.Issue,
                     line.Note,
-                    ReservedChange: -line.Quantity))
+                    ReservedChange: -line.Quantity,
+                    BatchId: line.BatchId)) // null = FEFO over non-expired lots
                 .ToList(),
             new StockReference(DocumentTypes.GoodsIssue, issue.Id, issue.DocumentNo),
             cancellationToken);
@@ -163,6 +164,7 @@ public sealed class GoodsIssueService(
             ProductId = line.ProductId,
             LocationId = line.LocationId,
             Quantity = line.Quantity,
+            BatchId = line.BatchId,
             Note = TrimToNull(line.Note)
         }));
     }
@@ -183,6 +185,20 @@ public sealed class GoodsIssueService(
             .Select(i => new { i.ProductId, i.LocationId, i.AvailableQuantity })
             .ToDictionaryAsync(i => (i.ProductId, i.LocationId), i => i.AvailableQuantity, cancellationToken);
 
+        // Chosen lots: must belong to the line's product and hold enough at that bin.
+        var batchIds = lines.Where(line => line.BatchId is not null).Select(line => line.BatchId!.Value).Distinct().ToList();
+        var batchesById = await DbContext.Set<Batch>()
+            .AsNoTracking()
+            .Where(batch => batchIds.Contains(batch.Id))
+            .Select(batch => new { batch.Id, batch.ProductId, batch.BatchCode, batch.ExpiryDate })
+            .ToDictionaryAsync(batch => batch.Id, cancellationToken);
+        var lotQuantities = await DbContext.Set<InventoryLot>()
+            .AsNoTracking()
+            .Where(lot => batchIds.Contains(lot.BatchId) && lot.Inventory!.WarehouseId == warehouseId)
+            .Select(lot => new { lot.BatchId, lot.Inventory!.LocationId, lot.Quantity })
+            .ToDictionaryAsync(lot => (lot.BatchId, lot.LocationId), lot => lot.Quantity, cancellationToken);
+        var today = Today;
+
         var errors = new List<string>();
         for (var index = 0; index < lines.Count; index++)
         {
@@ -198,11 +214,27 @@ public sealed class GoodsIssueService(
             {
                 errors.Add($"{prefix} quantity {line.Quantity:0.###} exceeds available stock {availableQuantity:0.###}.");
             }
+
+            if (line.BatchId is { } batchId)
+            {
+                if (!batchesById.TryGetValue(batchId, out var batch) || batch.ProductId != line.ProductId)
+                {
+                    errors.Add($"{prefix} batch {batchId} is not a batch of product {line.ProductId}.");
+                }
+                else if (batch.ExpiryDate < today)
+                {
+                    errors.Add($"{prefix} batch '{batch.BatchCode}' expired on {batch.ExpiryDate:yyyy-MM-dd} and cannot be issued.");
+                }
+                else if (line.Quantity > lotQuantities.GetValueOrDefault((batchId, line.LocationId)))
+                {
+                    errors.Add($"{prefix} batch '{batch.BatchCode}' has only {lotQuantities.GetValueOrDefault((batchId, line.LocationId)):0.###} at this location.");
+                }
+            }
         }
 
         errors.AddRange(DocumentLineValidator.Duplicates(
-            lines.Select(line => (object)(line.ProductId, line.LocationId)).ToList(),
-            "repeat the same product and location; merge them."));
+            lines.Select(line => (object)(line.ProductId, line.LocationId, line.BatchId)).ToList(),
+            "repeat the same product, location and batch; merge them."));
 
         DocumentLineValidator.ThrowIfAny(errors);
     }
@@ -212,6 +244,7 @@ public sealed class GoodsIssueService(
         ProductId = line.ProductId,
         LocationId = line.LocationId,
         Quantity = line.Quantity,
+        BatchId = line.BatchId,
         Note = line.Note
     };
 

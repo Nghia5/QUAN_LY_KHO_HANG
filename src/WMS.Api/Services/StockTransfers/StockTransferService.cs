@@ -150,15 +150,27 @@ public sealed class StockTransferService(
             await SaveAsync(cancellationToken); // RowVersion: shipping twice concurrently fails here
 
             // The stock was reserved at approval: quantity and reservation leave the source together.
-            var movements = await ledger.ApplyAsync(
-                transfer.Lines
-                    .Select(line => new StockChange(
-                        line.ProductId, line.WarehouseId, line.FromLocationId, -line.Quantity,
-                        MovementType.TransferOut, line.Note, ReservedChange: -line.Quantity))
-                    .ToList(),
-                Reference(transfer),
-                cancellationToken);
-            return new { MovementIds = movements.Select(movement => movement.Id) };
+            // Lots are allocated by FEFO and remembered on the line, to be received with the same lots.
+            var changes = transfer.Lines.ToDictionary(
+                line => line,
+                line => new StockChange(
+                    line.ProductId, line.WarehouseId, line.FromLocationId, -line.Quantity,
+                    MovementType.TransferOut, line.Note, ReservedChange: -line.Quantity));
+            var applied = await ledger.ApplyDetailedAsync(changes.Values.ToList(), Reference(transfer), cancellationToken);
+
+            foreach (var (line, change) in changes)
+            {
+                line.ShippedLots = applied.Single(result => ReferenceEquals(result.Change, change)).Movements
+                    .Select(movement => new ShippedLot { BatchId = movement.BatchId, Quantity = -movement.Quantity })
+                    .ToList();
+            }
+
+            await SaveAsync(cancellationToken);
+            return new
+            {
+                MovementIds = applied.SelectMany(result => result.Movements).Select(movement => movement.Id),
+                Lots = transfer.Lines.Select(line => new { line.Id, line.ShippedLots })
+            };
         }, cancellationToken);
 
     public Task<StockTransferDetail> ReceiveAsync(int id, CancellationToken cancellationToken) =>
@@ -172,11 +184,15 @@ public sealed class StockTransferService(
             await ValidateDestinationAsync(transfer.DestinationWarehouseId, transfer.Lines.Select(line => line.ToLocationId).ToList(), cancellationToken);
             await SaveAsync(cancellationToken);
 
+            // Same lots as shipped (one change per lot); lines shipped before lot tracking have none.
             var movements = await ledger.ApplyAsync(
                 transfer.Lines
-                    .Select(line => new StockChange(
-                        line.ProductId, line.DestinationWarehouseId, line.ToLocationId, line.Quantity,
-                        MovementType.TransferIn, line.Note))
+                    .SelectMany(line => line.ShippedLots.Count == 0
+                        ? [new ShippedLot { BatchId = null, Quantity = line.Quantity }]
+                        : line.ShippedLots,
+                        (line, lot) => new StockChange(
+                            line.ProductId, line.DestinationWarehouseId, line.ToLocationId, lot.Quantity,
+                            MovementType.TransferIn, line.Note, BatchId: lot.BatchId))
                     .ToList(),
                 Reference(transfer),
                 cancellationToken);

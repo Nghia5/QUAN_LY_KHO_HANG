@@ -68,6 +68,56 @@ namespace WMS.Api.Data.Migrations
                     b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
                 });
 
+            modelBuilder.Entity("WMS.Api.Models.Batch", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("BatchCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateOnly?>("ExpiryDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly?>("ManufactureDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiryDate");
+
+                    b.HasIndex("ProductId", "BatchCode")
+                        .IsUnique();
+
+                    b.ToTable("Batches", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Batches_Expiry_After_Manufacture", "[ExpiryDate] IS NULL OR [ManufactureDate] IS NULL OR [ExpiryDate] > [ManufactureDate]");
+                        });
+                });
+
             modelBuilder.Entity("WMS.Api.Models.Documents.GoodsIssue", b =>
                 {
                     b.Property<int>("Id")
@@ -190,6 +240,9 @@ namespace WMS.Api.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("BatchId")
+                        .HasColumnType("int");
+
                     b.Property<int>("GoodsIssueId")
                         .HasColumnType("int");
 
@@ -213,6 +266,8 @@ namespace WMS.Api.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ProductId");
+
+                    b.HasIndex("BatchId", "ProductId");
 
                     b.HasIndex("GoodsIssueId", "WarehouseId");
 
@@ -996,6 +1051,49 @@ namespace WMS.Api.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("WMS.Api.Models.InventoryLot", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BatchId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("InventoryId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BatchId");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("BatchId"), new[] { "Quantity" });
+
+                    b.HasIndex("BatchId", "ProductId");
+
+                    b.HasIndex("InventoryId", "BatchId")
+                        .IsUnique();
+
+                    b.HasIndex("InventoryId", "ProductId");
+
+                    b.ToTable("InventoryLots", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_InventoryLots_Quantity_NonNegative", "[Quantity] >= 0");
+                        });
+                });
+
             modelBuilder.Entity("WMS.Api.Models.Product", b =>
                 {
                     b.Property<int>("Id")
@@ -1053,6 +1151,9 @@ namespace WMS.Api.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
 
+                    b.Property<int?>("BatchId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -1105,6 +1206,8 @@ namespace WMS.Api.Data.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("BatchId");
 
                     b.HasIndex("LocationId");
 
@@ -1276,6 +1379,17 @@ namespace WMS.Api.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("WMS.Api.Models.Batch", b =>
+                {
+                    b.HasOne("WMS.Api.Models.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+                });
+
             modelBuilder.Entity("WMS.Api.Models.Documents.GoodsIssue", b =>
                 {
                     b.HasOne("WMS.Api.Models.Warehouse", "Warehouse")
@@ -1295,6 +1409,12 @@ namespace WMS.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("WMS.Api.Models.Batch", "Batch")
+                        .WithMany()
+                        .HasForeignKey("BatchId", "ProductId")
+                        .HasPrincipalKey("Id", "ProductId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("WMS.Api.Models.Documents.GoodsIssue", null)
                         .WithMany("Lines")
                         .HasForeignKey("GoodsIssueId", "WarehouseId")
@@ -1308,6 +1428,8 @@ namespace WMS.Api.Data.Migrations
                         .HasPrincipalKey("Id", "WarehouseId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("Batch");
 
                     b.Navigation("Location");
 
@@ -1438,9 +1560,35 @@ namespace WMS.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.OwnsMany("WMS.Api.Models.Documents.ShippedLot", "ShippedLots", b1 =>
+                        {
+                            b1.Property<int>("StockTransferLineId");
+
+                            b1.Property<int>("__synthesizedOrdinal")
+                                .ValueGeneratedOnAddOrUpdate();
+
+                            b1.Property<int?>("BatchId");
+
+                            b1.Property<decimal>("Quantity")
+                                .HasPrecision(18, 3);
+
+                            b1.HasKey("StockTransferLineId", "__synthesizedOrdinal");
+
+                            b1.ToTable("StockTransferLines");
+
+                            b1
+                                .ToJson("ShippedLots")
+                                .HasColumnType("nvarchar(max)");
+
+                            b1.WithOwner()
+                                .HasForeignKey("StockTransferLineId");
+                        });
+
                     b.Navigation("FromLocation");
 
                     b.Navigation("Product");
+
+                    b.Navigation("ShippedLots");
 
                     b.Navigation("ToLocation");
                 });
@@ -1511,8 +1659,34 @@ namespace WMS.Api.Data.Migrations
                     b.Navigation("Warehouse");
                 });
 
+            modelBuilder.Entity("WMS.Api.Models.InventoryLot", b =>
+                {
+                    b.HasOne("WMS.Api.Models.Batch", "Batch")
+                        .WithMany("Lots")
+                        .HasForeignKey("BatchId", "ProductId")
+                        .HasPrincipalKey("Id", "ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WMS.Api.Models.Inventory", "Inventory")
+                        .WithMany()
+                        .HasForeignKey("InventoryId", "ProductId")
+                        .HasPrincipalKey("Id", "ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Batch");
+
+                    b.Navigation("Inventory");
+                });
+
             modelBuilder.Entity("WMS.Api.Models.StockMovement", b =>
                 {
+                    b.HasOne("WMS.Api.Models.Batch", "Batch")
+                        .WithMany()
+                        .HasForeignKey("BatchId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("WMS.Api.Models.Inventory", null)
                         .WithMany()
                         .HasForeignKey("InventoryId")
@@ -1538,6 +1712,8 @@ namespace WMS.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.Navigation("Batch");
+
                     b.Navigation("Location");
 
                     b.Navigation("Product");
@@ -1562,6 +1738,11 @@ namespace WMS.Api.Data.Migrations
                     b.Navigation("Parent");
 
                     b.Navigation("Warehouse");
+                });
+
+            modelBuilder.Entity("WMS.Api.Models.Batch", b =>
+                {
+                    b.Navigation("Lots");
                 });
 
             modelBuilder.Entity("WMS.Api.Models.Documents.GoodsIssue", b =>

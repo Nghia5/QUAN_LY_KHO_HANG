@@ -34,6 +34,14 @@ public sealed class StockTransfer : WarehouseDocument
     public List<StockTransferLine> Lines { get; set; } = [];
 }
 
+/// <param name="BatchId">null = quantity without lot information.</param>
+public sealed class ShippedLot
+{
+    public int? BatchId { get; set; }
+
+    public decimal Quantity { get; set; }
+}
+
 public sealed class StockTransferLine
 {
     public int Id { get; set; }
@@ -58,6 +66,12 @@ public sealed class StockTransferLine
     public decimal Quantity { get; set; }
 
     public string? Note { get; set; }
+
+    /// <summary>
+    /// Lots that left the source when shipped (FEFO allocation); received into the destination
+    /// with the same lots. Stored as JSON.
+    /// </summary>
+    public List<ShippedLot> ShippedLots { get; set; } = [];
 
     public Product? Product { get; set; }
 
