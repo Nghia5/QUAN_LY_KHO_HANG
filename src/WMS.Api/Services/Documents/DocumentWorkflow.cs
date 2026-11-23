@@ -14,6 +14,12 @@ public sealed class WarehouseOptions
     /// Four-eyes rule: when false (default) the creator of a document cannot approve it.
     /// </summary>
     public bool AllowSelfApproval { get; set; }
+
+    /// <summary>
+    /// When true (default) stock adjustments must be approved by a STOCK_ADJUSTMENT_APPROVE user;
+    /// when false, submitting an adjustment applies it immediately.
+    /// </summary>
+    public bool RequireAdjustmentApproval { get; set; } = true;
 }
 
 /// <summary>Workflow actions; also returned to the UI as the actions currently allowed.</summary>
@@ -118,6 +124,23 @@ public sealed class DocumentWorkflow(ICurrentUser currentUser, TimeProvider time
         document.ApprovedBy = currentUser.UserId;
         Stamp(document);
     }
+
+    public RequirementsInfo Requirements => new(options.Value.RequireAdjustmentApproval);
+
+    /// <summary>
+    /// Approval granted by policy (no approver required, e.g. adjustments when
+    /// RequireAdjustmentApproval = false). Recorded as approved by the submitter.
+    /// </summary>
+    public void ApproveByPolicy(WarehouseDocument document)
+    {
+        EnsureCan(document, DocumentAction.Approve);
+        document.Status = DocumentStatus.Approved;
+        document.ApprovedAt = Now;
+        document.ApprovedBy = currentUser.UserId;
+        Stamp(document);
+    }
+
+    public sealed record RequirementsInfo(bool AdjustmentApproval);
 
     public void Reject(WarehouseDocument document, string reason)
     {

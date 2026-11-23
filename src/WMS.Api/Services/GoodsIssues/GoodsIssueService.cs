@@ -112,8 +112,11 @@ public sealed class GoodsIssueService(
         ValidateAsync(issue.WarehouseId, issue.Lines.Select(ToRequest).ToList(), cancellationToken);
 
     /// <summary>The authoritative availability check: conditional, atomic reservation per line.</summary>
-    protected override Task OnApprovedAsync(GoodsIssue issue, CancellationToken cancellationToken) =>
-        reservations.ReserveAsync(ToReservations(issue), cancellationToken);
+    protected override async Task<object?> OnApprovedAsync(GoodsIssue issue, CancellationToken cancellationToken)
+    {
+        await reservations.ReserveAsync(ToReservations(issue), cancellationToken);
+        return new { Reserved = issue.Lines.Sum(line => line.Quantity) };
+    }
 
     protected override Task OnCancelledAsync(GoodsIssue issue, DocumentStatus previousStatus, CancellationToken cancellationToken) =>
         previousStatus == DocumentStatus.Approved

@@ -7,13 +7,20 @@ namespace WMS.Api.Data.Configurations;
 public static class DocumentConfigurationExtensions
 {
     /// <summary>Shared mapping of <see cref="WarehouseDocument"/> header columns.</summary>
-    public static void ConfigureDocument<T>(this EntityTypeBuilder<T> builder, string tableName)
+    public static void ConfigureDocument<T>(
+        this EntityTypeBuilder<T> builder,
+        string tableName,
+        Action<TableBuilder<T>>? table = null)
         where T : WarehouseDocument
     {
-        builder.ToTable(tableName, table => table.HasCheckConstraint(
-            $"CK_{tableName}_Status",
-            "[Status] IN ('Draft', 'PendingApproval', 'Approved', 'InProgress', 'Completed', 'Rejected', 'Cancelled', " +
-            "'Picked', 'InTransit', 'Received', 'Adjusted')"));
+        builder.ToTable(tableName, tableBuilder =>
+        {
+            tableBuilder.HasCheckConstraint(
+                $"CK_{tableName}_Status",
+                "[Status] IN ('Draft', 'PendingApproval', 'Approved', 'InProgress', 'Completed', 'Rejected', 'Cancelled', " +
+                "'Picked', 'InTransit', 'Received', 'Adjusted')");
+            table?.Invoke(tableBuilder);
+        });
 
         builder.HasKey(document => document.Id);
 

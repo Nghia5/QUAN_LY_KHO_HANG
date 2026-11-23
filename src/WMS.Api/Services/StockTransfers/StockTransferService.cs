@@ -120,8 +120,11 @@ public sealed class StockTransferService(
     protected override Task BeforeSubmitAsync(StockTransfer transfer, CancellationToken cancellationToken) =>
         ValidateAsync(transfer.WarehouseId, transfer.DestinationWarehouseId, ToRequests(transfer), checkAvailability: true, cancellationToken);
 
-    protected override Task OnApprovedAsync(StockTransfer transfer, CancellationToken cancellationToken) =>
-        reservations.ReserveAsync(ToReservations(transfer), cancellationToken);
+    protected override async Task<object?> OnApprovedAsync(StockTransfer transfer, CancellationToken cancellationToken)
+    {
+        await reservations.ReserveAsync(ToReservations(transfer), cancellationToken);
+        return new { Reserved = transfer.Lines.Sum(line => line.Quantity) };
+    }
 
     protected override Task OnCancelledAsync(StockTransfer transfer, DocumentStatus previousStatus, CancellationToken cancellationToken) =>
         previousStatus is DocumentStatus.Approved or DocumentStatus.Picked

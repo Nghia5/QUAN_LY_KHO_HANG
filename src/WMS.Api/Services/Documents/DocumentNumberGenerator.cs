@@ -12,6 +12,7 @@ public static class DocumentTypes
     public const string GoodsIssue = "GOODS_ISSUE";
     public const string StockTransfer = "STOCK_TRANSFER";
     public const string Stocktake = "STOCKTAKE";
+    public const string StockAdjustment = "STOCK_ADJUSTMENT";
 
     /// <summary>(reference type, prefix, sequence name)</summary>
     public static readonly IReadOnlyList<(string Type, string Prefix, string Sequence)> All =
@@ -19,7 +20,8 @@ public static class DocumentTypes
         (GoodsReceipt, "GR", "GoodsReceiptNumbers"),
         (GoodsIssue, "GI", "GoodsIssueNumbers"),
         (StockTransfer, "TR", "StockTransferNumbers"),
-        (Stocktake, "ST", "StocktakeNumbers")
+        (Stocktake, "ST", "StocktakeNumbers"),
+        (StockAdjustment, "ADJ", "StockAdjustmentNumbers")
     ];
 }
 

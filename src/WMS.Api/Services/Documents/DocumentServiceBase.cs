@@ -58,7 +58,9 @@ public abstract class DocumentServiceBase<TDocument, TDetail>(
     protected virtual Task BeforeSubmitAsync(TDocument document, CancellationToken cancellationToken) => Task.CompletedTask;
 
     /// <summary>Runs after the status became Approved, inside the transaction (e.g. reserve stock).</summary>
-    protected virtual Task OnApprovedAsync(TDocument document, CancellationToken cancellationToken) => Task.CompletedTask;
+    /// <returns>Extra data stored in the APPROVED audit entry.</returns>
+    protected virtual Task<object?> OnApprovedAsync(TDocument document, CancellationToken cancellationToken) =>
+        Task.FromResult<object?>(null);
 
     /// <summary>Runs after the status became Cancelled, inside the transaction (e.g. release reservations).</summary>
     protected virtual Task OnCancelledAsync(TDocument document, DocumentStatus previousStatus, CancellationToken cancellationToken) =>
@@ -76,16 +78,19 @@ public abstract class DocumentServiceBase<TDocument, TDetail>(
             await BeforeSubmitAsync(document, cancellationToken);
             workflow.Submit(document);
             await SaveAsync(cancellationToken);
-            return null;
+            return await OnSubmittedAsync(document, cancellationToken);
         }, cancellationToken);
+
+    /// <summary>Runs after Draft → PendingApproval inside the transaction (e.g. auto-approval by policy).</summary>
+    protected virtual Task<object?> OnSubmittedAsync(TDocument document, CancellationToken cancellationToken) =>
+        Task.FromResult<object?>(null);
 
     public async Task<TDetail> ApproveAsync(int id, CancellationToken cancellationToken) =>
         await RunAsync(id, "APPROVED", async document =>
         {
             workflow.Approve(document);
             await SaveAsync(cancellationToken); // a concurrent approve of the same document fails here
-            await OnApprovedAsync(document, cancellationToken);
-            return null;
+            return await OnApprovedAsync(document, cancellationToken);
         }, cancellationToken);
 
     public async Task<TDetail> RejectAsync(int id, string reason, CancellationToken cancellationToken) =>
