@@ -22,6 +22,86 @@ namespace WMS.Api.Data.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("WMS.Api.Models.Inventory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("AvailableQuantity")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)")
+                        .HasComputedColumnSql("[Quantity] - [ReservedQuantity]", true);
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<int>("LocationId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("MinQuantity")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)")
+                        .HasDefaultValue(0m);
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Quantity")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)")
+                        .HasDefaultValue(0m);
+
+                    b.Property<decimal>("ReservedQuantity")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)")
+                        .HasDefaultValue(0m);
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("WarehouseId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LocationId", "WarehouseId");
+
+                    b.HasIndex("WarehouseId", "ProductId");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("WarehouseId", "ProductId"), new[] { "Quantity", "ReservedQuantity", "AvailableQuantity" });
+
+                    b.HasIndex("ProductId", "WarehouseId", "LocationId")
+                        .IsUnique();
+
+                    b.ToTable("Inventories", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Inventories_Available_NonNegative", "[AvailableQuantity] >= 0");
+
+                            t.HasCheckConstraint("CK_Inventories_MinQuantity_NonNegative", "[MinQuantity] >= 0");
+
+                            t.HasCheckConstraint("CK_Inventories_Quantity_NonNegative", "[Quantity] >= 0");
+
+                            t.HasCheckConstraint("CK_Inventories_Reserved_LTE_Quantity", "[ReservedQuantity] <= [Quantity]");
+
+                            t.HasCheckConstraint("CK_Inventories_Reserved_NonNegative", "[ReservedQuantity] >= 0");
+                        });
+                });
+
             modelBuilder.Entity("WMS.Api.Models.Product", b =>
                 {
                     b.Property<int>("Id")
@@ -207,6 +287,34 @@ namespace WMS.Api.Data.Migrations
 
                             t.HasCheckConstraint("CK_WarehouseLocations_Type", "[Type] IN ('Zone', 'Rack', 'Shelf', 'Bin')");
                         });
+                });
+
+            modelBuilder.Entity("WMS.Api.Models.Inventory", b =>
+                {
+                    b.HasOne("WMS.Api.Models.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WMS.Api.Models.Warehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WMS.Api.Models.WarehouseLocation", "Location")
+                        .WithMany()
+                        .HasForeignKey("LocationId", "WarehouseId")
+                        .HasPrincipalKey("Id", "WarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Location");
+
+                    b.Navigation("Product");
+
+                    b.Navigation("Warehouse");
                 });
 
             modelBuilder.Entity("WMS.Api.Models.WarehouseLocation", b =>

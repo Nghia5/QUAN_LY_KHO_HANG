@@ -3,6 +3,7 @@ using WMS.Api.Authorization;
 using WMS.Api.Common;
 using WMS.Api.Middleware;
 using WMS.Api.Repositories;
+using WMS.Api.Services.Inventories;
 using WMS.Api.Services.Locations;
 using WMS.Api.Services.Warehouses;
 
@@ -37,6 +38,9 @@ public static class WarehouseModuleExtensions
         services.AddScoped<ILocationRepository, LocationRepository>();
         services.AddScoped<ILocationService, LocationService>();
         services.AddScoped<IWarehouseDependencyChecker, LocationWarehouseDependencyChecker>();
+
+        services.AddScoped<IWarehouseDependencyChecker, InventoryWarehouseDependencyChecker>();
+        services.AddScoped<ILocationDependencyChecker, InventoryLocationDependencyChecker>();
 
         return services;
     }
