@@ -34,7 +34,7 @@ public sealed class SqlServerDatabaseFixture : IAsyncLifetime
     public WmsDbContext CreateContext() =>
         new(new DbContextOptionsBuilder<WmsDbContext>()
             .UseSqlServer(ConnectionString)
-            .AddInterceptors(Sql)
+            .AddInterceptors(Sql, new WMS.Api.Data.Interceptors.StockMovementImmutabilityInterceptor())
             .Options);
 
     public async Task InitializeAsync()

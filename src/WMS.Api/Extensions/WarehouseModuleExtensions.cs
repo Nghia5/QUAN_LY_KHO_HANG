@@ -1,6 +1,9 @@
 using FluentValidation;
 using WMS.Api.Authorization;
+using Microsoft.EntityFrameworkCore;
 using WMS.Api.Common;
+using WMS.Api.Data;
+using WMS.Api.Data.Interceptors;
 using WMS.Api.Middleware;
 using WMS.Api.Repositories;
 using WMS.Api.Services.Inventories;
@@ -42,6 +45,14 @@ public static class WarehouseModuleExtensions
         services.AddScoped<IInventoryRepository, InventoryRepository>();
         services.AddScoped<IWarehouseDependencyChecker, InventoryWarehouseDependencyChecker>();
         services.AddScoped<ILocationDependencyChecker, InventoryLocationDependencyChecker>();
+
+        // Stock ledger (W-06): movements are append-only, guarded in EF and by a DB trigger.
+        services.ConfigureDbContext<WmsDbContext>(options =>
+            options.AddInterceptors(new StockMovementImmutabilityInterceptor()));
+        services.AddScoped<IStockLedger, StockLedger>();
+        services.AddScoped<IStockMovementRepository, StockMovementRepository>();
+        services.AddScoped<IWarehouseDependencyChecker, StockMovementWarehouseDependencyChecker>();
+        services.AddScoped<ILocationDependencyChecker, StockMovementLocationDependencyChecker>();
 
         return services;
     }

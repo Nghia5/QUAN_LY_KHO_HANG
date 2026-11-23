@@ -151,6 +151,99 @@ namespace WMS.Api.Data.Migrations
                     b.ToTable("Products");
                 });
 
+            modelBuilder.Entity("WMS.Api.Models.StockMovement", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<int>("InventoryId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("LocationId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("MovementType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)");
+
+                    b.Property<decimal>("QuantityAfter")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)");
+
+                    b.Property<decimal>("QuantityBefore")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)");
+
+                    b.Property<int?>("ReferenceId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ReferenceNo")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("ReferenceType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<int>("WarehouseId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LocationId");
+
+                    b.HasIndex("InventoryId", "Id");
+
+                    b.HasIndex("LocationId", "WarehouseId");
+
+                    b.HasIndex("ProductId", "CreatedAt");
+
+                    b.HasIndex("ReferenceType", "ReferenceId");
+
+                    b.HasIndex("WarehouseId", "CreatedAt");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("WarehouseId", "CreatedAt"), new[] { "ProductId", "Quantity" });
+
+                    b.ToTable("StockMovements", null, t =>
+                        {
+                            t.HasTrigger("TR_StockMovements_Immutable");
+
+                            t.HasCheckConstraint("CK_StockMovements_After_NonNegative", "[QuantityAfter] >= 0");
+
+                            t.HasCheckConstraint("CK_StockMovements_Balance", "[QuantityAfter] = [QuantityBefore] + [Quantity]");
+
+                            t.HasCheckConstraint("CK_StockMovements_Before_NonNegative", "[QuantityBefore] >= 0");
+
+                            t.HasCheckConstraint("CK_StockMovements_Direction", "([MovementType] IN ('Receipt', 'TransferIn', 'AdjustmentIn', 'StocktakeIn') AND [Quantity] > 0) OR ([MovementType] IN ('Issue', 'TransferOut', 'AdjustmentOut', 'StocktakeOut') AND [Quantity] < 0)");
+
+                            t.HasCheckConstraint("CK_StockMovements_Quantity_NonZero", "[Quantity] <> 0");
+                        });
+
+                    b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
+                });
+
             modelBuilder.Entity("WMS.Api.Models.Warehouse", b =>
                 {
                     b.Property<int>("Id")
@@ -291,6 +384,40 @@ namespace WMS.Api.Data.Migrations
 
             modelBuilder.Entity("WMS.Api.Models.Inventory", b =>
                 {
+                    b.HasOne("WMS.Api.Models.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WMS.Api.Models.Warehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WMS.Api.Models.WarehouseLocation", "Location")
+                        .WithMany()
+                        .HasForeignKey("LocationId", "WarehouseId")
+                        .HasPrincipalKey("Id", "WarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Location");
+
+                    b.Navigation("Product");
+
+                    b.Navigation("Warehouse");
+                });
+
+            modelBuilder.Entity("WMS.Api.Models.StockMovement", b =>
+                {
+                    b.HasOne("WMS.Api.Models.Inventory", null)
+                        .WithMany()
+                        .HasForeignKey("InventoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("WMS.Api.Models.Product", "Product")
                         .WithMany()
                         .HasForeignKey("ProductId")
