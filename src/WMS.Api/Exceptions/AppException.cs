@@ -14,6 +14,10 @@ public sealed class NotFoundException(string resource, object key)
 public sealed class ConflictException(string message)
     : AppException("Conflict", message, StatusCodes.Status409Conflict);
 
+/// <summary>Authenticated but not allowed to perform this specific action.</summary>
+public sealed class ForbiddenException(string message)
+    : AppException("Forbidden", message, StatusCodes.Status403Forbidden);
+
 /// <summary>Request is well-formed but violates a business rule.</summary>
 public sealed class BusinessRuleException(string message)
     : AppException("Business rule violation", message, StatusCodes.Status422UnprocessableEntity);

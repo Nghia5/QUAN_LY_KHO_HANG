@@ -5,8 +5,9 @@ using WMS.Api.Models;
 namespace WMS.Api.Data.Interceptors;
 
 /// <summary>
-/// Application-level guard: stock movements may only be inserted. The database trigger
-/// TR_StockMovements_Immutable is the final guard for anything that bypasses EF.
+/// Application-level guard: stock movements and audit logs may only be inserted. The database
+/// triggers TR_StockMovements_Immutable / TR_AuditLogs_Immutable are the final guard for
+/// anything that bypasses EF.
 /// </summary>
 public sealed class StockMovementImmutabilityInterceptor : SaveChangesInterceptor
 {
@@ -32,13 +33,14 @@ public sealed class StockMovementImmutabilityInterceptor : SaveChangesIntercepto
             return;
         }
 
-        var violation = context.ChangeTracker.Entries<StockMovement>()
+        var violation = context.ChangeTracker.Entries()
+            .Where(entry => entry.Entity is StockMovement or AuditLog)
             .FirstOrDefault(entry => entry.State is EntityState.Modified or EntityState.Deleted);
 
         if (violation is not null)
         {
             throw new InvalidOperationException(
-                $"Stock movement {violation.Entity.Id} is immutable and cannot be {violation.State.ToString().ToLowerInvariant()}.");
+                $"{violation.Entity.GetType().Name} records are immutable and cannot be {violation.State.ToString().ToLowerInvariant()}.");
         }
     }
 }

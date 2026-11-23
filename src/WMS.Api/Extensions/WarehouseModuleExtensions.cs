@@ -6,6 +6,9 @@ using WMS.Api.Data;
 using WMS.Api.Data.Interceptors;
 using WMS.Api.Middleware;
 using WMS.Api.Repositories;
+using WMS.Api.Services.Audit;
+using WMS.Api.Services.Documents;
+using WMS.Api.Services.GoodsReceipts;
 using WMS.Api.Services.Inventories;
 using WMS.Api.Services.Locations;
 using WMS.Api.Services.Warehouses;
@@ -53,6 +56,17 @@ public static class WarehouseModuleExtensions
         services.AddScoped<IStockMovementRepository, StockMovementRepository>();
         services.AddScoped<IWarehouseDependencyChecker, StockMovementWarehouseDependencyChecker>();
         services.AddScoped<ILocationDependencyChecker, StockMovementLocationDependencyChecker>();
+
+        // Documents (W-07+): shared workflow, numbering and audit trail.
+        services.AddOptions<WarehouseOptions>().BindConfiguration(WarehouseOptions.SectionName);
+        services.AddScoped<DocumentWorkflow>();
+        services.AddScoped<IDocumentNumberGenerator, DocumentNumberGenerator>();
+        services.AddScoped<IAuditLogger, AuditLogger>();
+
+        services.AddScoped<IGoodsReceiptRepository, GoodsReceiptRepository>();
+        services.AddScoped<IGoodsReceiptService, GoodsReceiptService>();
+        services.AddScoped<IWarehouseDependencyChecker, GoodsReceiptWarehouseDependencyChecker>();
+        services.AddScoped<ILocationDependencyChecker, GoodsReceiptLocationDependencyChecker>();
 
         return services;
     }

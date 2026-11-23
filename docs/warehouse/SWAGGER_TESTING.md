@@ -31,6 +31,19 @@ dotnet ef database update
 `/api/dev/token` chỉ hoạt động khi `ASPNETCORE_ENVIRONMENT=Development`; ở môi trường khác trả 404.
 Khi module User/Login của Người 3 hoàn thành, dùng token đăng nhập thật thay cho endpoint này.
 
+## Chứng từ có duyệt (Nhập kho, Xuất kho, ...)
+
+Người tạo phiếu **không được tự duyệt** (four-eyes). Để test trên Swagger cần 2 token:
+
+1. Token nhân viên: `POST /api/dev/token` với `{ "userId": 7 }` → Authorize → tạo phiếu → `submit`.
+2. Token quản lý: `POST /api/dev/token` với `{ "userId": 8 }` → Authorize lại bằng token mới → `approve` → `complete`.
+
+Muốn cho phép tự duyệt (chỉ nên dùng khi demo), thêm vào `appsettings.Development.json`:
+
+```json
+"Warehouse": { "AllowSelfApproval": true }
+```
+
 ## Mã lỗi thường gặp
 
 | HTTP | Ý nghĩa |

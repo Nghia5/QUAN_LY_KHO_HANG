@@ -6,10 +6,16 @@ public interface ICurrentUser
 {
     /// <summary>Id of the authenticated user, or null when it cannot be resolved as an integer.</summary>
     int? UserId { get; }
+
+    /// <summary>True when the user has the given permission claim.</summary>
+    bool HasPermission(string permission);
 }
 
 public sealed class HttpContextCurrentUser(IHttpContextAccessor httpContextAccessor) : ICurrentUser
 {
+    public bool HasPermission(string permission) =>
+        httpContextAccessor.HttpContext?.User.HasClaim(Constants.Permissions.ClaimType, permission) == true;
+
     public int? UserId
     {
         get
