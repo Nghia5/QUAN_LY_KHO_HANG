@@ -18,6 +18,7 @@ builder.Services.AddAuthentication().AddJwtBearer();
 // Product module
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddExceptionHandler<ProductSkuConflictExceptionHandler>();
+builder.Services.AddExceptionHandler<ProductInUseExceptionHandler>();
 
 // Warehouse module
 builder.Services.AddWarehouseModule();
