@@ -11,13 +11,15 @@ public static class DocumentTypes
     public const string GoodsReceipt = "GOODS_RECEIPT";
     public const string GoodsIssue = "GOODS_ISSUE";
     public const string StockTransfer = "STOCK_TRANSFER";
+    public const string Stocktake = "STOCKTAKE";
 
     /// <summary>(reference type, prefix, sequence name)</summary>
     public static readonly IReadOnlyList<(string Type, string Prefix, string Sequence)> All =
     [
         (GoodsReceipt, "GR", "GoodsReceiptNumbers"),
         (GoodsIssue, "GI", "GoodsIssueNumbers"),
-        (StockTransfer, "TR", "StockTransferNumbers")
+        (StockTransfer, "TR", "StockTransferNumbers"),
+        (Stocktake, "ST", "StocktakeNumbers")
     ];
 }
 

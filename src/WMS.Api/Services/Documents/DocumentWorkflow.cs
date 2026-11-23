@@ -29,7 +29,10 @@ public enum DocumentAction
     Cancel,
     Pick,
     Ship,
-    Receive
+    Receive,
+    Snapshot,
+    Count,
+    Adjust
 }
 
 /// <summary>
@@ -45,6 +48,13 @@ public sealed class DocumentWorkflow(ICurrentUser currentUser, TimeProvider time
     public static IReadOnlyList<DocumentAction> AvailableActions(DocumentStatus status, DocumentFlow flow = DocumentFlow.Standard) =>
         (status, flow) switch
         {
+            // Stocktake: Draft → snapshot → InProgress (count) → submit → PendingApproval → approve
+            // → Approved → adjust → Adjusted → complete. Reject sends it back to InProgress (recount).
+            (DocumentStatus.Draft, DocumentFlow.Stocktake) => [DocumentAction.Edit, DocumentAction.Delete, DocumentAction.Snapshot, DocumentAction.Cancel],
+            (DocumentStatus.InProgress, DocumentFlow.Stocktake) => [DocumentAction.Count, DocumentAction.Submit, DocumentAction.Cancel],
+            (DocumentStatus.Approved, DocumentFlow.Stocktake) => [DocumentAction.Adjust, DocumentAction.Cancel],
+            (DocumentStatus.Adjusted, DocumentFlow.Stocktake) => [DocumentAction.Complete],
+
             (DocumentStatus.Draft, _) => [DocumentAction.Edit, DocumentAction.Delete, DocumentAction.Submit, DocumentAction.Cancel],
             (DocumentStatus.PendingApproval, _) => [DocumentAction.Approve, DocumentAction.Reject, DocumentAction.Cancel],
             (DocumentStatus.Rejected, _) => [DocumentAction.Reopen, DocumentAction.Cancel],
@@ -113,7 +123,8 @@ public sealed class DocumentWorkflow(ICurrentUser currentUser, TimeProvider time
     {
         EnsureCan(document, DocumentAction.Reject);
         EnsureNotOwnDocument(document);
-        document.Status = DocumentStatus.Rejected;
+        // A rejected stocktake goes straight back to counting; other documents wait for "reopen".
+        document.Status = document.Flow == DocumentFlow.Stocktake ? DocumentStatus.InProgress : DocumentStatus.Rejected;
         document.RejectedAt = Now;
         document.RejectedBy = currentUser.UserId;
         document.RejectionReason = reason.Trim();

@@ -18,14 +18,18 @@ public enum DocumentStatus
     InTransit = 9,
 
     /// <summary>Transfer: goods received at the destination (TRANSFER_IN posted).</summary>
-    Received = 10
+    Received = 10,
+
+    /// <summary>Stocktake: differences posted as stock movements.</summary>
+    Adjusted = 11
 }
 
 /// <summary>Which state machine a document follows.</summary>
 public enum DocumentFlow
 {
     Standard,
-    Transfer
+    Transfer,
+    Stocktake
 }
 
 /// <summary>

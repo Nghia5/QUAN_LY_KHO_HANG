@@ -4,6 +4,8 @@ using WMS.Api.Common;
 using WMS.Api.Data;
 using WMS.Api.Exceptions;
 using WMS.Api.Models;
+using WMS.Api.Models.Documents;
+using WMS.Api.Services.Documents;
 
 namespace WMS.Api.Services.Inventories;
 
@@ -95,6 +97,10 @@ public sealed class StockLedger(
             });
         }
 
+        // Checked AFTER the updates: if a stocktake snapshot is being taken concurrently, our UPDATE
+        // waited for it, so its lines are visible now and this change is rolled back.
+        await EnsureNotBeingCountedAsync(changes, reference, cancellationToken);
+
         dbContext.Set<StockMovement>().AddRange(movements);
         await dbContext.SaveChangesAsync(cancellationToken);
 
@@ -104,6 +110,33 @@ public sealed class StockLedger(
         }
 
         return movements;
+    }
+
+    /// <summary>Statuses in which a stocktake freezes the stock of its counted locations (spec 5.3).</summary>
+    public static readonly DocumentStatus[] StocktakeLockStatuses =
+        [DocumentStatus.InProgress, DocumentStatus.PendingApproval, DocumentStatus.Approved];
+
+    private async Task EnsureNotBeingCountedAsync(
+        IReadOnlyCollection<StockChange> changes,
+        StockReference reference,
+        CancellationToken cancellationToken)
+    {
+        var locationIds = changes.Select(change => change.LocationId).Distinct().ToList();
+        int? ownStocktakeId = reference.ReferenceType == DocumentTypes.Stocktake ? reference.ReferenceId : null;
+
+        var lockedBy = await dbContext.Set<StocktakeLine>()
+            .Where(line => locationIds.Contains(line.LocationId))
+            .Join(dbContext.Set<Stocktake>(), line => line.StocktakeId, stocktake => stocktake.Id,
+                (line, stocktake) => new { stocktake.Id, stocktake.DocumentNo, stocktake.Status, LocationCode = line.Location!.Code })
+            .Where(x => StocktakeLockStatuses.Contains(x.Status) && x.Id != ownStocktakeId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (lockedBy is not null)
+        {
+            throw new BusinessRuleException(
+                $"Location '{lockedBy.LocationCode}' is being counted by stocktake {lockedBy.DocumentNo}; " +
+                "stock there cannot change until the stocktake is adjusted or cancelled.");
+        }
     }
 
     private static void Validate(StockChange change)

@@ -13,12 +13,13 @@ public static class DocumentStatuses
     public static readonly DocumentStatus[] Open =
     [
         DocumentStatus.Draft, DocumentStatus.PendingApproval, DocumentStatus.Approved, DocumentStatus.InProgress,
-        DocumentStatus.Rejected, DocumentStatus.Picked, DocumentStatus.InTransit, DocumentStatus.Received
+        DocumentStatus.Rejected, DocumentStatus.Picked, DocumentStatus.InTransit, DocumentStatus.Received,
+        DocumentStatus.Adjusted
     ];
 
     /// <summary>Statuses before approval: cancelling them needs no approve permission.</summary>
     public static readonly DocumentStatus[] BeforeApproval =
-        [DocumentStatus.Draft, DocumentStatus.PendingApproval, DocumentStatus.Rejected];
+        [DocumentStatus.Draft, DocumentStatus.PendingApproval, DocumentStatus.Rejected, DocumentStatus.InProgress];
 }
 
 /// <summary>

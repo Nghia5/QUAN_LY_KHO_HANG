@@ -12,6 +12,7 @@ using WMS.Api.Services.GoodsIssues;
 using WMS.Api.Services.GoodsReceipts;
 using WMS.Api.Services.Inventories;
 using WMS.Api.Services.Locations;
+using WMS.Api.Services.Stocktakes;
 using WMS.Api.Services.StockTransfers;
 using WMS.Api.Services.Warehouses;
 
@@ -80,6 +81,11 @@ public static class WarehouseModuleExtensions
         services.AddScoped<IStockTransferService, StockTransferService>();
         services.AddScoped<IWarehouseDependencyChecker, StockTransferWarehouseDependencyChecker>();
         services.AddScoped<ILocationDependencyChecker, StockTransferLocationDependencyChecker>();
+
+        services.AddScoped<IStocktakeRepository, StocktakeRepository>();
+        services.AddScoped<IStocktakeService, StocktakeService>();
+        services.AddScoped<IWarehouseDependencyChecker, StocktakeWarehouseDependencyChecker>();
+        services.AddScoped<ILocationDependencyChecker, StocktakeLocationDependencyChecker>();
 
         return services;
     }

@@ -178,7 +178,7 @@ namespace WMS.Api.Data.Migrations
 
                     b.ToTable("GoodsIssues", null, t =>
                         {
-                            t.HasCheckConstraint("CK_GoodsIssues_Status", "[Status] IN ('Draft', 'PendingApproval', 'Approved', 'InProgress', 'Completed', 'Rejected', 'Cancelled', 'Picked', 'InTransit', 'Received')");
+                            t.HasCheckConstraint("CK_GoodsIssues_Status", "[Status] IN ('Draft', 'PendingApproval', 'Approved', 'InProgress', 'Completed', 'Rejected', 'Cancelled', 'Picked', 'InTransit', 'Received', 'Adjusted')");
                         });
                 });
 
@@ -334,7 +334,7 @@ namespace WMS.Api.Data.Migrations
 
                     b.ToTable("GoodsReceipts", null, t =>
                         {
-                            t.HasCheckConstraint("CK_GoodsReceipts_Status", "[Status] IN ('Draft', 'PendingApproval', 'Approved', 'InProgress', 'Completed', 'Rejected', 'Cancelled', 'Picked', 'InTransit', 'Received')");
+                            t.HasCheckConstraint("CK_GoodsReceipts_Status", "[Status] IN ('Draft', 'PendingApproval', 'Approved', 'InProgress', 'Completed', 'Rejected', 'Cancelled', 'Picked', 'InTransit', 'Received', 'Adjusted')");
                         });
                 });
 
@@ -519,7 +519,7 @@ namespace WMS.Api.Data.Migrations
 
                     b.ToTable("StockTransfers", null, t =>
                         {
-                            t.HasCheckConstraint("CK_StockTransfers_Status", "[Status] IN ('Draft', 'PendingApproval', 'Approved', 'InProgress', 'Completed', 'Rejected', 'Cancelled', 'Picked', 'InTransit', 'Received')");
+                            t.HasCheckConstraint("CK_StockTransfers_Status", "[Status] IN ('Draft', 'PendingApproval', 'Approved', 'InProgress', 'Completed', 'Rejected', 'Cancelled', 'Picked', 'InTransit', 'Received', 'Adjusted')");
                         });
                 });
 
@@ -572,6 +572,187 @@ namespace WMS.Api.Data.Migrations
                             t.HasCheckConstraint("CK_StockTransferLines_DifferentLocations", "[FromLocationId] <> [ToLocationId]");
 
                             t.HasCheckConstraint("CK_StockTransferLines_Quantity_Positive", "[Quantity] > 0");
+                        });
+                });
+
+            modelBuilder.Entity("WMS.Api.Models.Documents.Stocktake", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("AdjustedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("AdjustedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("ApprovedBy")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CancellationReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("CancelledAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CancelledBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CompletedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<string>("DocumentNo")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime?>("RejectedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("RejectedBy")
+                        .HasColumnType("int");
+
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.PrimitiveCollection<string>("ScopeLocationIds")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTime?>("SnapshotAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("SnapshotBy")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime?>("SubmittedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("SubmittedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<int>("WarehouseId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("DocumentNo")
+                        .IsUnique();
+
+                    b.HasIndex("WarehouseId", "Status");
+
+                    b.ToTable("Stocktakes", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Stocktakes_Status", "[Status] IN ('Draft', 'PendingApproval', 'Approved', 'InProgress', 'Completed', 'Rejected', 'Cancelled', 'Picked', 'InTransit', 'Received', 'Adjusted')");
+                        });
+                });
+
+            modelBuilder.Entity("WMS.Api.Models.Documents.StocktakeLine", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("CountedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CountedBy")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("CountedQuantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)");
+
+                    b.Property<decimal?>("Difference")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)")
+                        .HasComputedColumnSql("[CountedQuantity] - [SystemQuantity]", true);
+
+                    b.Property<bool>("IsAddedDuringCount")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("LocationId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("StocktakeId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("SystemQuantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)");
+
+                    b.Property<int>("WarehouseId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LocationId");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("LocationId", "WarehouseId");
+
+                    b.HasIndex("StocktakeId", "WarehouseId");
+
+                    b.HasIndex("StocktakeId", "ProductId", "LocationId")
+                        .IsUnique();
+
+                    b.ToTable("StocktakeLines", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_StocktakeLines_Counted_NonNegative", "[CountedQuantity] IS NULL OR [CountedQuantity] >= 0");
+
+                            t.HasCheckConstraint("CK_StocktakeLines_System_NonNegative", "[SystemQuantity] >= 0");
                         });
                 });
 
@@ -1066,6 +1247,44 @@ namespace WMS.Api.Data.Migrations
                     b.Navigation("ToLocation");
                 });
 
+            modelBuilder.Entity("WMS.Api.Models.Documents.Stocktake", b =>
+                {
+                    b.HasOne("WMS.Api.Models.Warehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Warehouse");
+                });
+
+            modelBuilder.Entity("WMS.Api.Models.Documents.StocktakeLine", b =>
+                {
+                    b.HasOne("WMS.Api.Models.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WMS.Api.Models.WarehouseLocation", "Location")
+                        .WithMany()
+                        .HasForeignKey("LocationId", "WarehouseId")
+                        .HasPrincipalKey("Id", "WarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WMS.Api.Models.Documents.Stocktake", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("StocktakeId", "WarehouseId")
+                        .HasPrincipalKey("Id", "WarehouseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Location");
+
+                    b.Navigation("Product");
+                });
+
             modelBuilder.Entity("WMS.Api.Models.Inventory", b =>
                 {
                     b.HasOne("WMS.Api.Models.Product", "Product")
@@ -1158,6 +1377,11 @@ namespace WMS.Api.Data.Migrations
                 });
 
             modelBuilder.Entity("WMS.Api.Models.Documents.StockTransfer", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("WMS.Api.Models.Documents.Stocktake", b =>
                 {
                     b.Navigation("Lines");
                 });
