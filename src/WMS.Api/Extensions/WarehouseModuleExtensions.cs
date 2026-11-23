@@ -39,6 +39,7 @@ public static class WarehouseModuleExtensions
         services.AddScoped<ILocationService, LocationService>();
         services.AddScoped<IWarehouseDependencyChecker, LocationWarehouseDependencyChecker>();
 
+        services.AddScoped<IInventoryRepository, InventoryRepository>();
         services.AddScoped<IWarehouseDependencyChecker, InventoryWarehouseDependencyChecker>();
         services.AddScoped<ILocationDependencyChecker, InventoryLocationDependencyChecker>();
 
