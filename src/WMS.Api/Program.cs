@@ -23,7 +23,7 @@ builder.Services.AddExceptionHandler<ProductSkuConflictExceptionHandler>();
 builder.Services.AddWarehouseModule();
 
 builder.Services.AddProblemDetails();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options => options.AddJwtBearerSecurity());
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
