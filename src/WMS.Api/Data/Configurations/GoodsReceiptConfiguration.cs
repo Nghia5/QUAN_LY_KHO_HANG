@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using WMS.Api.Models;
 using WMS.Api.Models.Documents;
 
 namespace WMS.Api.Data.Configurations;
@@ -14,6 +15,12 @@ public sealed class GoodsReceiptConfiguration : IEntityTypeConfiguration<GoodsRe
         builder.Property(receipt => receipt.ReferenceNo).HasMaxLength(50);
         builder.HasIndex(receipt => receipt.SupplierId);
         builder.HasIndex(receipt => receipt.ReceiptDate);
+
+        // Suppliers are only soft-deleted (deactivated), so a referenced supplier can never disappear.
+        builder.HasOne<SupplierModel>()
+            .WithMany()
+            .HasForeignKey(receipt => receipt.SupplierId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasMany(receipt => receipt.Lines)
             .WithOne()

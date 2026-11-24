@@ -31,6 +31,8 @@ public sealed class GoodsReceiptFixture : IAsyncLifetime
 
     public int OtherWarehouseBinId { get; private set; }
 
+    public int SupplierId { get; private set; }
+
     public async Task InitializeAsync()
     {
         await Database.InitializeAsync();
@@ -42,6 +44,11 @@ public sealed class GoodsReceiptFixture : IAsyncLifetime
         Bin1Id = bins[0].Id;
         Bin2Id = bins[1].Id;
         OtherWarehouseBinId = otherBins[0].Id;
+
+        var supplier = new SupplierModel { Code = "ACME", Name = "ACME Co." };
+        context.Add(supplier);
+        await context.SaveChangesAsync();
+        SupplierId = supplier.Id;
     }
 
     public Task DisposeAsync() => Database.DisposeAsync();
@@ -97,8 +104,8 @@ public sealed class GoodsReceiptServiceTests(GoodsReceiptFixture fixture) : ICla
     private CreateGoodsReceiptRequest Request(params GoodsReceiptLineRequest[] lines) => new()
     {
         WarehouseId = fixture.WarehouseId,
-        SupplierId = 5,
-        SupplierName = "ACME",
+        SupplierId = fixture.SupplierId,
+        SupplierName = "typed by user (ignored: the supplier master name wins)",
         ReferenceNo = "INV-001",
         Lines = lines
     };
@@ -456,6 +463,108 @@ public sealed class GoodsReceiptServiceTests(GoodsReceiptFixture fixture) : ICla
     }
 
     /// <summary>Simulates a failure at the very end of the completion transaction.</summary>
+    private async Task<int> NewSupplierAsync(bool active = true)
+    {
+        await using var context = fixture.Database.CreateContext();
+        var supplier = new SupplierModel
+        {
+            Code = $"S{Guid.NewGuid():N}"[..20],
+            Name = $"Supplier {Guid.NewGuid():N}"[..15],
+            IsActive = active
+        };
+        context.Add(supplier);
+        await context.SaveChangesAsync();
+        return supplier.Id;
+    }
+
+    [Fact]
+    public async Task Supplier_name_is_copied_from_the_supplier_master()
+    {
+        var product = await NewProductAsync();
+        await using var clerk = As(Clerk);
+        var receipt = await clerk.Service.CreateAsync(Request(Line(product, 1)), default);
+
+        Assert.Equal(fixture.SupplierId, receipt.SupplierId);
+        Assert.Equal("ACME Co.", receipt.SupplierName);
+    }
+
+    [Fact]
+    public async Task Free_text_supplier_name_is_allowed_without_supplier_id()
+    {
+        var product = await NewProductAsync();
+        await using var clerk = As(Clerk);
+        var receipt = await clerk.Service.CreateAsync(
+            Request(Line(product, 1)) with { SupplierId = null, SupplierName = "  Walk-in seller  " }, default);
+
+        Assert.Null(receipt.SupplierId);
+        Assert.Equal("Walk-in seller", receipt.SupplierName);
+    }
+
+    [Fact]
+    public async Task Unknown_or_inactive_supplier_is_rejected()
+    {
+        var product = await NewProductAsync();
+        var inactive = await NewSupplierAsync(active: false);
+        await using var clerk = As(Clerk);
+
+        var unknown = await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            clerk.Service.CreateAsync(Request(Line(product, 1)) with { SupplierId = 999_999 }, default));
+        Assert.Contains("Supplier 999999 does not exist", unknown.Message);
+
+        var deactivated = await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            clerk.Service.CreateAsync(Request(Line(product, 1)) with { SupplierId = inactive }, default));
+        Assert.Contains("is inactive", deactivated.Message);
+    }
+
+    [Fact]
+    public async Task Supplier_deactivated_after_drafting_blocks_submit_but_not_completion_after_approval()
+    {
+        var product = await NewProductAsync();
+        var supplier = await NewSupplierAsync();
+
+        int draftId, approvedId;
+        await using (var clerk = As(Clerk))
+        {
+            draftId = (await clerk.Service.CreateAsync(Request(Line(product, 1)) with { SupplierId = supplier }, default)).Id;
+            approvedId = (await clerk.Service.CreateAsync(Request(Line(product, 2)) with { SupplierId = supplier }, default)).Id;
+            await clerk.Service.SubmitAsync(approvedId, default);
+        }
+
+        await using (var manager = As(Manager))
+        {
+            await manager.Service.ApproveAsync(approvedId, default);
+            await manager.Context.Set<SupplierModel>()
+                .Where(s => s.Id == supplier)
+                .ExecuteUpdateAsync(set => set.SetProperty(s => s.IsActive, false));
+        }
+
+        await using (var clerk = As(Clerk))
+        {
+            var error = await Assert.ThrowsAsync<BusinessRuleException>(() => clerk.Service.SubmitAsync(draftId, default));
+            Assert.Contains("is inactive", error.Message);
+        }
+
+        await using (var manager = As(Manager))
+        {
+            var completed = await manager.Service.CompleteAsync(approvedId, default);
+            Assert.Equal(DocumentStatus.Completed, completed.Status);
+        }
+
+        Assert.Equal(2m, await StockAsync(product));
+    }
+
+    [Fact]
+    public async Task Database_rejects_a_supplier_id_that_does_not_exist()
+    {
+        var product = await NewProductAsync();
+        await using var clerk = As(Clerk);
+        var receipt = await clerk.Service.CreateAsync(Request(Line(product, 1)), default);
+
+        var exception = await Assert.ThrowsAnyAsync<Exception>(() =>
+            clerk.Context.Database.ExecuteSqlAsync($"UPDATE GoodsReceipts SET SupplierId = 999999 WHERE Id = {receipt.Id}"));
+        Assert.Contains("FK_GoodsReceipts_Suppliers_SupplierId", exception.Message);
+    }
+
     private sealed class FailingAuditLogger : IAuditLogger
     {
         public void Log(string entityType, object entityId, string action, object? data = null)

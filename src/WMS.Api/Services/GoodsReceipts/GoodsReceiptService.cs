@@ -71,14 +71,15 @@ public sealed class GoodsReceiptService(
     public async Task<GoodsReceiptDetail> CreateAsync(CreateGoodsReceiptRequest request, CancellationToken cancellationToken)
     {
         var receiptDate = request.ReceiptDate ?? Today;
-        await ValidateAsync(request.WarehouseId, receiptDate, request.Lines, cancellationToken);
+        var supplierName = await ValidateAsync(
+            request.WarehouseId, request.SupplierId, requireActiveSupplier: true, receiptDate, request.Lines, cancellationToken);
 
         var receipt = new GoodsReceipt
         {
             DocumentNo = await numberGenerator.NextAsync(DocumentTypes.GoodsReceipt, cancellationToken),
             WarehouseId = request.WarehouseId
         };
-        Apply(receipt, request, receiptDate);
+        Apply(receipt, request, receiptDate, supplierName);
         Workflow.Created(receipt);
 
         await using (var transaction = await DbContext.Database.BeginTransactionAsync(cancellationToken))
@@ -99,10 +100,11 @@ public sealed class GoodsReceiptService(
         Workflow.EnsureCan(receipt, DocumentAction.Edit);
 
         var receiptDate = request.ReceiptDate ?? receipt.ReceiptDate;
-        await ValidateAsync(receipt.WarehouseId, receiptDate, request.Lines, cancellationToken);
+        var supplierName = await ValidateAsync(
+            receipt.WarehouseId, request.SupplierId, requireActiveSupplier: true, receiptDate, request.Lines, cancellationToken);
 
         receipt.Lines.Clear(); // lines of a draft are replaced as a whole
-        Apply(receipt, request, receiptDate);
+        Apply(receipt, request, receiptDate, supplierName);
         Workflow.Stamp(receipt);
         Audit.Log(AuditEntity, receipt.Id, "UPDATED", new { receipt.DocumentNo, LineCount = receipt.Lines.Count });
         await SaveAsync(cancellationToken);
@@ -110,12 +112,18 @@ public sealed class GoodsReceiptService(
         return await GetAsync(id, cancellationToken);
     }
 
+    // The supplier may have been deactivated while the receipt was a draft: it must still be active to submit.
     protected override Task BeforeSubmitAsync(GoodsReceipt receipt, CancellationToken cancellationToken) =>
-        ValidateAsync(receipt.WarehouseId, receipt.ReceiptDate, receipt.Lines.Select(ToRequest).ToList(), cancellationToken);
+        ValidateAsync(
+            receipt.WarehouseId, receipt.SupplierId, requireActiveSupplier: true,
+            receipt.ReceiptDate, receipt.Lines.Select(ToRequest).ToList(), cancellationToken);
 
     // Master data may have changed since approval (product/location deactivated...): re-check.
+    // A supplier deactivated after approval does not block posting goods that were ordered from it.
     protected override Task BeforeCompleteAsync(GoodsReceipt receipt, CancellationToken cancellationToken) =>
-        ValidateAsync(receipt.WarehouseId, receipt.ReceiptDate, receipt.Lines.Select(ToRequest).ToList(), cancellationToken);
+        ValidateAsync(
+            receipt.WarehouseId, receipt.SupplierId, requireActiveSupplier: false,
+            receipt.ReceiptDate, receipt.Lines.Select(ToRequest).ToList(), cancellationToken);
 
     protected override async Task<object?> OnCompletingAsync(GoodsReceipt receipt, CancellationToken cancellationToken)
     {
@@ -149,10 +157,12 @@ public sealed class GoodsReceiptService(
         };
     }
 
-    private static void Apply(GoodsReceipt receipt, IGoodsReceiptPayload request, DateOnly receiptDate)
+    private static void Apply(GoodsReceipt receipt, IGoodsReceiptPayload request, DateOnly receiptDate, string? supplierName)
     {
+        // With a SupplierId the name is copied from the supplier master (a snapshot kept on the document);
+        // without one, a free-text name is allowed (e.g. a one-off supplier).
         receipt.SupplierId = request.SupplierId;
-        receipt.SupplierName = TrimToNull(request.SupplierName);
+        receipt.SupplierName = supplierName ?? TrimToNull(request.SupplierName);
         receipt.ReferenceNo = TrimToNull(request.ReferenceNo);
         receipt.ReceiptDate = receiptDate;
         receipt.Note = TrimToNull(request.Note);
@@ -172,17 +182,43 @@ public sealed class GoodsReceiptService(
 
     /// <summary>
     /// Database-dependent rules; all problems are collected and reported together with line numbers.
+    /// Returns the supplier's current name when a supplier is given.
     /// </summary>
-    private async Task ValidateAsync(
+    private async Task<string?> ValidateAsync(
         int warehouseId,
+        int? supplierId,
+        bool requireActiveSupplier,
         DateOnly receiptDate,
         IReadOnlyList<GoodsReceiptLineRequest> lines,
         CancellationToken cancellationToken)
     {
+        var errors = new List<string>();
+        string? supplierName = null;
+        if (supplierId is { } id)
+        {
+            var supplier = await DbContext.Set<SupplierModel>()
+                .AsNoTracking()
+                .Where(candidate => candidate.Id == id)
+                .Select(candidate => new { candidate.Name, candidate.IsActive })
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (supplier is null)
+            {
+                errors.Add($"Supplier {id} does not exist.");
+            }
+            else if (requireActiveSupplier && !supplier.IsActive)
+            {
+                errors.Add($"Supplier {id} ({supplier.Name}) is inactive.");
+            }
+            else
+            {
+                supplierName = supplier.Name;
+            }
+        }
+
         var context = await DocumentLineValidator.LoadAsync(
             DbContext, warehouseId, lines.Select(line => (line.ProductId, line.LocationId)).ToList(), cancellationToken);
 
-        var errors = new List<string>();
         for (var index = 0; index < lines.Count; index++)
         {
             var line = lines[index];
@@ -215,6 +251,7 @@ public sealed class GoodsReceiptService(
             "repeat the same product, location and batch; merge them."));
 
         DocumentLineValidator.ThrowIfAny(errors);
+        return supplierName;
     }
 
     private static GoodsReceiptLineRequest ToRequest(GoodsReceiptLine line) => new()

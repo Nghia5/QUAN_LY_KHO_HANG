@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using WMS.Api.Data;
 using WMS.Api.Extensions;
 using WMS.Api.Middleware;
+using WMS.Api.Repositories;
 using WMS.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -17,6 +18,8 @@ builder.Services.AddAuthentication().AddJwtBearer();
 
 // Product module
 builder.Services.AddScoped<IProductService, ProductService>();
+builder.Services.AddScoped<ISupplierRepository, SupplierRepository>();
+builder.Services.AddScoped<ISupplierService, SupplierService>();
 builder.Services.AddExceptionHandler<ProductSkuConflictExceptionHandler>();
 builder.Services.AddExceptionHandler<ProductInUseExceptionHandler>();
 
