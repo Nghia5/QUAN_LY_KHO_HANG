@@ -1,3 +1,5 @@
+using WMS.Api.Authorization;
+using WMS.Api.Constants;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WMS.Api.Dtos.Suppliers;
@@ -6,11 +8,12 @@ using WMS.Api.Services;
 namespace WMS.Api.Controllers;
 
 [ApiController]
-[Authorize(Policy = WMS.Api.Authorization.ActiveAdminRequirement.PolicyName)]
+[Authorize]
 [Route("api/suppliers")]
 public class SuppliersController(ISupplierService supplierService) : ControllerBase
 {
     [HttpGet]
+    [CatalogPermission(Permissions.SupplierView, allowWarehouseGrant: true)]
     public async Task<ActionResult<List<SupplierResponseDto>>> GetAll(
         [FromQuery] string? keyword,
         [FromQuery] bool? isActive,
@@ -18,6 +21,7 @@ public class SuppliersController(ISupplierService supplierService) : ControllerB
         Ok(await supplierService.GetAllAsync(keyword, isActive, cancellationToken));
 
     [HttpGet("{id:int}")]
+    [CatalogPermission(Permissions.SupplierView, allowWarehouseGrant: true)]
     public async Task<ActionResult<SupplierResponseDto>> GetById(
         int id,
         CancellationToken cancellationToken)
@@ -32,6 +36,7 @@ public class SuppliersController(ISupplierService supplierService) : ControllerB
     }
 
     [HttpPost]
+    [CatalogPermission(Permissions.SupplierManage)]
     public async Task<ActionResult<SupplierResponseDto>> Create(
         CreateSupplierRequestDto request,
         CancellationToken cancellationToken)
@@ -46,6 +51,7 @@ public class SuppliersController(ISupplierService supplierService) : ControllerB
     }
 
     [HttpPut("{id:int}")]
+    [CatalogPermission(Permissions.SupplierManage)]
     public async Task<ActionResult<SupplierResponseDto>> Update(
         int id,
         UpdateSupplierRequestDto request,
@@ -61,6 +67,7 @@ public class SuppliersController(ISupplierService supplierService) : ControllerB
     }
 
     [HttpDelete("{id:int}")]
+    [CatalogPermission(Permissions.SupplierManage)]
     public async Task<ActionResult<SupplierResponseDto>> Deactivate(
         int id,
         CancellationToken cancellationToken)

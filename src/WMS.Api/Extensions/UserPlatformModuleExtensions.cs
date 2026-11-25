@@ -25,6 +25,7 @@ public static class UserPlatformModuleExtensions
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IRoleService, RoleService>();
         services.AddScoped<IFileStorageService, FileStorageService>();
+        services.AddScoped<DocumentAttachmentAccess>();
 
         return services;
     }

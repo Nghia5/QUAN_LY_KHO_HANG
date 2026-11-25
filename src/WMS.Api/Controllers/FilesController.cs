@@ -1,15 +1,15 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WMS.Api.Common;
-using WMS.Api.Constants;
 using WMS.Api.Dtos.Files;
 using WMS.Api.Exceptions;
+using WMS.Api.Models.Documents;
 using WMS.Api.Services.Files;
 
 namespace WMS.Api.Controllers;
 
 [ApiController]
-[Authorize(Policy = Permissions.FileUpload)]
+[Authorize]
 [Route("api/files")]
 public sealed class FilesController(IFileStorageService fileStorageService, ICurrentUser currentUser) : ControllerBase
 {
@@ -41,6 +41,11 @@ public sealed class FilesController(IFileStorageService fileStorageService, ICur
         Response.Headers["X-Content-Type-Options"] = "nosniff";
         return File(file.Stream, "application/octet-stream", file.FileName);
     }
+
+    [HttpGet("document/{documentType}/{documentId:int:min(1)}")]
+    public async Task<ActionResult<IReadOnlyList<DocumentAttachmentResponse>>> ListDocumentAttachments(
+        WarehouseDocumentType documentType, int documentId, CancellationToken cancellationToken) =>
+        Ok(await fileStorageService.ListDocumentAttachmentsAsync(documentType, documentId, cancellationToken));
 
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)

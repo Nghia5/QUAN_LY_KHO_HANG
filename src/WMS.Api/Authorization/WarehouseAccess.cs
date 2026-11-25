@@ -28,6 +28,9 @@ public sealed class WarehouseAccess(WmsDbContext dbContext, ICurrentUser current
             ? Grants(userId, permission).AnyAsync(a => a.WarehouseId == warehouseId, cancellationToken)
             : Task.FromResult(false);
 
+    public Task<bool> HasAnyAsync(string permission, CancellationToken cancellationToken) =>
+        currentUser.UserId is int userId ? Grants(userId, permission).AnyAsync(cancellationToken) : Task.FromResult(false);
+
     private IQueryable<WarehouseRoleAssignment> Grants(int userId, string permission) =>
         dbContext.Set<WarehouseRoleAssignment>()
             .Where(a => a.UserId == userId && a.User.IsActive && a.Role.IsActive

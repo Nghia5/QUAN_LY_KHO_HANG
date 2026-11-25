@@ -17,6 +17,10 @@ public static class Permissions
     public const string UserDelete = "USER_DELETE";
     public const string RoleManage = "ROLE_MANAGE";
     public const string FileUpload = "FILE_UPLOAD";
+    public const string ProductView = "PRODUCT_VIEW";
+    public const string ProductManage = "PRODUCT_MANAGE";
+    public const string SupplierView = "SUPPLIER_VIEW";
+    public const string SupplierManage = "SUPPLIER_MANAGE";
 
     // Warehouse & Location permissions
     public const string WarehouseView = "WAREHOUSE_VIEW";

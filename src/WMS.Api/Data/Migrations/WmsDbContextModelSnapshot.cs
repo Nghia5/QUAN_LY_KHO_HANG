@@ -1434,6 +1434,12 @@ namespace WMS.Api.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<int?>("DocumentId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("DocumentType")
+                        .HasColumnType("int");
+
                     b.Property<string>("FilePath")
                         .IsRequired()
                         .HasMaxLength(500)
@@ -1464,7 +1470,12 @@ namespace WMS.Api.Data.Migrations
 
                     b.HasIndex("UploadedBy");
 
-                    b.ToTable("UploadedFiles", (string)null);
+                    b.HasIndex("DocumentType", "DocumentId");
+
+                    b.ToTable("UploadedFiles", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_UploadedFiles_Document", "([DocumentType] IS NULL AND [DocumentId] IS NULL) OR ([DocumentType] IS NOT NULL AND [DocumentType] BETWEEN 1 AND 5 AND [DocumentId] IS NOT NULL AND [DocumentId] > 0)");
+                        });
                 });
 
             modelBuilder.Entity("WMS.Api.Models.User", b =>

@@ -8,9 +8,13 @@ public sealed class UploadedFileConfiguration : IEntityTypeConfiguration<Uploade
 {
     public void Configure(EntityTypeBuilder<UploadedFile> builder)
     {
-        builder.ToTable("UploadedFiles");
+        builder.ToTable("UploadedFiles", table => table.HasCheckConstraint(
+            "CK_UploadedFiles_Document",
+            "([DocumentType] IS NULL AND [DocumentId] IS NULL) OR " +
+            "([DocumentType] IS NOT NULL AND [DocumentType] BETWEEN 1 AND 5 AND [DocumentId] IS NOT NULL AND [DocumentId] > 0)"));
 
         builder.HasKey(file => file.Id);
+        builder.HasIndex(file => new { file.DocumentType, file.DocumentId });
 
         builder.Property(file => file.OriginalFileName)
             .HasMaxLength(255)

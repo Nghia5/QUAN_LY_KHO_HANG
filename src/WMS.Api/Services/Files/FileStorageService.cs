@@ -3,6 +3,7 @@ using WMS.Api.Repositories;
 using WMS.Api.Dtos.Files;
 using WMS.Api.Exceptions;
 using WMS.Api.Models;
+using WMS.Api.Models.Documents;
 
 namespace WMS.Api.Services.Files;
 
@@ -10,7 +11,8 @@ public sealed class FileStorageService(
     IUploadedFileRepository uploadedFileRepository,
     IWebHostEnvironment environment,
     IConfiguration configuration,
-    TimeProvider timeProvider) : IFileStorageService
+    TimeProvider timeProvider,
+    DocumentAttachmentAccess attachmentAccess) : IFileStorageService
 {
     private string BaseStorageDirectory =>
         configuration["Storage:UploadDirectory"]
@@ -58,6 +60,12 @@ public sealed class FileStorageService(
 
     public async Task<UploadFileResponse> UploadDocumentAsync(UploadDocumentRequest request, int? userId, CancellationToken cancellationToken)
     {
+        if (request.DocumentType is not { } documentType || request.DocumentId is not { } documentId)
+        {
+            throw new BusinessRuleException("A document type and ID are required.");
+        }
+
+        await attachmentAccess.RequireAsync(documentType, documentId, write: true, cancellationToken);
         var documentsDir = Path.Combine(BaseStorageDirectory, "documents");
         Directory.CreateDirectory(documentsDir);
 
@@ -79,6 +87,8 @@ public sealed class FileStorageService(
             ContentType = request.File.ContentType,
             FileSize = request.File.Length,
             UploadedBy = userId,
+            DocumentType = documentType,
+            DocumentId = documentId,
             UploadedAt = timeProvider.GetUtcNow().UtcDateTime
         };
 
@@ -98,7 +108,7 @@ public sealed class FileStorageService(
 
     public async Task<FileDownloadInfo> GetFileDownloadAsync(Guid fileId, int userId, CancellationToken cancellationToken)
     {
-        var fileRecord = await FindOwnedFileAsync(fileId, userId, cancellationToken);
+        var fileRecord = await FindAccessibleFileAsync(fileId, userId, write: false, cancellationToken);
 
         var physicalPath = Path.Combine(BaseStorageDirectory, fileRecord.FilePath.Replace('/', Path.DirectorySeparatorChar));
         if (!File.Exists(physicalPath))
@@ -112,7 +122,7 @@ public sealed class FileStorageService(
 
     public async Task DeleteFileAsync(Guid fileId, int userId, CancellationToken cancellationToken)
     {
-        var fileRecord = await FindOwnedFileAsync(fileId, userId, cancellationToken);
+        var fileRecord = await FindAccessibleFileAsync(fileId, userId, write: true, cancellationToken);
 
         var physicalPath = Path.Combine(BaseStorageDirectory, fileRecord.FilePath.Replace('/', Path.DirectorySeparatorChar));
         if (File.Exists(physicalPath))
@@ -124,12 +134,30 @@ public sealed class FileStorageService(
         await uploadedFileRepository.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task<UploadedFile> FindOwnedFileAsync(Guid fileId, int userId, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<DocumentAttachmentResponse>> ListDocumentAttachmentsAsync(
+        WarehouseDocumentType type, int id, CancellationToken cancellationToken)
     {
-        var file = await uploadedFileRepository.FindAsync(fileId, cancellationToken);
-        if (file is null || file.UploadedBy != userId)
+        await attachmentAccess.RequireAsync(type, id, write: false, cancellationToken);
+        var files = await uploadedFileRepository.ListForDocumentAsync(type, id, cancellationToken);
+        return files.Select(file => new DocumentAttachmentResponse(
+            file.Id, file.OriginalFileName, file.FileSize, file.UploadedAt, $"/api/files/{file.Id}")).ToList();
+    }
+
+    private async Task<UploadedFile> FindAccessibleFileAsync(
+        Guid fileId, int userId, bool write, CancellationToken cancellationToken)
+    {
+        var file = await uploadedFileRepository.FindAsync(fileId, cancellationToken)
+            ?? throw new NotFoundException("File", fileId);
+
+        var isAttachment = file.DocumentType is not null && file.DocumentId is not null;
+        if ((write || !isAttachment) && file.UploadedBy != userId)
         {
             throw new NotFoundException("File", fileId);
+        }
+
+        if (file.DocumentType is { } type && file.DocumentId is { } documentId)
+        {
+            await attachmentAccess.RequireAsync(type, documentId, write, cancellationToken);
         }
 
         return file;

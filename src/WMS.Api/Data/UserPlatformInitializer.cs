@@ -14,7 +14,8 @@ public static class UserPlatformInitializer
     [
         Permissions.WarehouseView, Permissions.LocationView, Permissions.InventoryView, Permissions.StockMovementView,
         Permissions.GoodsReceiptView, Permissions.GoodsIssueView, Permissions.StockTransferView,
-        Permissions.StocktakeView, Permissions.StockAdjustmentView, Permissions.BatchView
+        Permissions.StocktakeView, Permissions.StockAdjustmentView, Permissions.BatchView,
+        Permissions.ProductView, Permissions.SupplierView
     ];
 
     private static readonly string[] StaffPermissions =
@@ -40,7 +41,8 @@ public static class UserPlatformInitializer
         var db = scope.ServiceProvider.GetRequiredService<WmsDbContext>();
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
         var permissions = await db.Permissions.ToDictionaryAsync(p => p.Code, StringComparer.OrdinalIgnoreCase, cancellationToken);
-        foreach (var code in Permissions.All.Where(code => !permissions.ContainsKey(code)))
+        var newCodes = Permissions.All.Where(code => !permissions.ContainsKey(code)).ToHashSet();
+        foreach (var code in newCodes)
         {
             var permission = new Permission { Code = code, Group = "WMS" };
             db.Permissions.Add(permission);
@@ -79,8 +81,13 @@ public static class UserPlatformInitializer
 
         void AddRole(string code, string name, IEnumerable<string> permissionCodes)
         {
-            if (roles.ContainsKey(code))
+            if (roles.TryGetValue(code, out var existingRole))
             {
+                foreach (var permissionCode in permissionCodes.Where(newCodes.Contains))
+                {
+                    existingRole.RolePermissions.Add(new RolePermission { Permission = permissions[permissionCode] });
+                }
+
                 return;
             }
 

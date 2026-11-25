@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Http;
+using WMS.Api.Models.Documents;
 
 namespace WMS.Api.Dtos.Files;
 
@@ -50,6 +51,14 @@ public sealed record UploadDocumentRequest : IValidatableObject
     [Required(ErrorMessage = "Document file is required.")]
     public required IFormFile File { get; init; }
 
+    [Required]
+    [EnumDataType(typeof(WarehouseDocumentType))]
+    public WarehouseDocumentType? DocumentType { get; init; }
+
+    [Required]
+    [Range(1, int.MaxValue)]
+    public int? DocumentId { get; init; }
+
     [MaxLength(255, ErrorMessage = "Description cannot exceed 255 characters.")]
     public string? Description { get; init; }
 
@@ -91,3 +100,5 @@ public sealed record FileDownloadInfo(
     Stream Stream,
     string ContentType,
     string FileName);
+
+public sealed record DocumentAttachmentResponse(Guid Id, string FileName, long Size, DateTime UploadedAt, string FileUrl);

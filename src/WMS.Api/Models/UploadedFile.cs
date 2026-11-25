@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using WMS.Api.Models.Documents;
 
 namespace WMS.Api.Models;
 
@@ -32,6 +33,8 @@ public sealed class UploadedFile : IValidatableObject
     [Range(1, int.MaxValue, ErrorMessage = "UploadedBy must be a positive integer.")]
     public int? UploadedBy { get; set; }
     public User? Uploader { get; set; }
+    public WarehouseDocumentType? DocumentType { get; set; }
+    public int? DocumentId { get; set; }
 
     public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
 
