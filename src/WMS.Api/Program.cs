@@ -11,7 +11,9 @@ using WMS.Api.Middleware;
 using WMS.Api.Repositories;
 using WMS.Api.Services;
 
-var builder = WebApplication.CreateBuilder(args);
+var initializeUserPlatform = args.Contains("--initialize-user-platform", StringComparer.Ordinal);
+var builder = WebApplication.CreateBuilder(
+    args.Where(arg => arg != "--initialize-user-platform").ToArray());
 
 // Add services to the container.
 builder.Services.AddControllers();
@@ -76,6 +78,12 @@ builder.Services.AddExceptionHandler<ProductInUseExceptionHandler>();
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+
+if (initializeUserPlatform)
+{
+    await UserPlatformInitializer.InitializeAsync(app.Services, app.Configuration, CancellationToken.None);
+    return;
+}
 
 // Configure the HTTP request pipeline.
 app.UseExceptionHandler();

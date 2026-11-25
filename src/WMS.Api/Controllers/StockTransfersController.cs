@@ -90,28 +90,28 @@ public sealed class StockTransfersController(IStockTransferService service) : Co
 
     /// <summary>Approved → Picked.</summary>
     [HttpPost("{id:int}/pick")]
-    [WarehousePermission(Permissions.StockTransferCreate, WarehouseResource.Transfer)]
+    [WarehousePermission(Permissions.StockTransferPick, WarehouseResource.Transfer)]
     [ProducesResponseType<StockTransferDetail>(StatusCodes.Status200OK)]
     public async Task<ActionResult<StockTransferDetail>> Pick(int id, CancellationToken cancellationToken) =>
         Ok(await service.PickAsync(id, cancellationToken));
 
     /// <summary>Picked → InTransit: source stock decreases (TRANSFER_OUT).</summary>
     [HttpPost("{id:int}/ship")]
-    [WarehousePermission(Permissions.StockTransferCreate, WarehouseResource.Transfer)]
+    [WarehousePermission(Permissions.StockTransferShip, WarehouseResource.Transfer)]
     [ProducesResponseType<StockTransferDetail>(StatusCodes.Status200OK)]
     public async Task<ActionResult<StockTransferDetail>> Ship(int id, CancellationToken cancellationToken) =>
         Ok(await service.ShipAsync(id, cancellationToken));
 
     /// <summary>InTransit → Received: destination stock increases (TRANSFER_IN).</summary>
     [HttpPost("{id:int}/receive")]
-    [WarehousePermission(Permissions.StockTransferCreate, WarehouseResource.TransferDestination)]
+    [WarehousePermission(Permissions.StockTransferReceive, WarehouseResource.TransferDestination)]
     [ProducesResponseType<StockTransferDetail>(StatusCodes.Status200OK)]
     public async Task<ActionResult<StockTransferDetail>> Receive(int id, CancellationToken cancellationToken) =>
         Ok(await service.ReceiveAsync(id, cancellationToken));
 
     /// <summary>Received → Completed.</summary>
     [HttpPost("{id:int}/complete")]
-    [WarehousePermission(Permissions.StockTransferApprove, WarehouseResource.TransferDestination)]
+    [WarehousePermission(Permissions.StockTransferComplete, WarehouseResource.TransferDestination)]
     [ProducesResponseType<StockTransferDetail>(StatusCodes.Status200OK)]
     public async Task<ActionResult<StockTransferDetail>> Complete(int id, CancellationToken cancellationToken) =>
         Ok(await service.CompleteAsync(id, cancellationToken));

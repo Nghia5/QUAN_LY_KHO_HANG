@@ -75,7 +75,7 @@ public sealed class StocktakesController(IStocktakeService service) : Controller
 
     /// <summary>COUNT: records counted quantities (repeatable while InProgress; new items are added).</summary>
     [HttpPut("{id:int}/counts")]
-    [WarehousePermission(Permissions.StocktakeCreate, WarehouseResource.Stocktake)]
+    [WarehousePermission(Permissions.StocktakeCount, WarehouseResource.Stocktake)]
     [ProducesResponseType<StocktakeDetail>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
     public async Task<ActionResult<StocktakeDetail>> Count(int id, StocktakeCountRequest request, CancellationToken cancellationToken) =>
@@ -104,14 +104,14 @@ public sealed class StocktakesController(IStocktakeService service) : Controller
 
     /// <summary>ADJUSTMENT: posts the differences as STOCKTAKE_IN/OUT movements.</summary>
     [HttpPost("{id:int}/adjust")]
-    [WarehousePermission(Permissions.StocktakeApprove, WarehouseResource.Stocktake)]
+    [WarehousePermission(Permissions.StocktakeAdjust, WarehouseResource.Stocktake)]
     [ProducesResponseType<StocktakeDetail>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<StocktakeDetail>> Adjust(int id, CancellationToken cancellationToken) =>
         Ok(await service.AdjustAsync(id, cancellationToken));
 
     [HttpPost("{id:int}/complete")]
-    [WarehousePermission(Permissions.StocktakeApprove, WarehouseResource.Stocktake)]
+    [WarehousePermission(Permissions.StocktakeComplete, WarehouseResource.Stocktake)]
     [ProducesResponseType<StocktakeDetail>(StatusCodes.Status200OK)]
     public async Task<ActionResult<StocktakeDetail>> Complete(int id, CancellationToken cancellationToken) =>
         Ok(await service.CompleteAsync(id, cancellationToken));

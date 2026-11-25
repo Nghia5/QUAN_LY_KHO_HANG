@@ -104,7 +104,7 @@ public sealed class GoodsReceiptsController(IGoodsReceiptService service) : Cont
 
     /// <summary>Approved → Completed: increases stock, writes stock movements and audit in one transaction.</summary>
     [HttpPost("{id:int}/complete")]
-    [WarehousePermission(Permissions.GoodsReceiptApprove, WarehouseResource.Receipt)]
+    [WarehousePermission(Permissions.GoodsReceiptComplete, WarehouseResource.Receipt)]
     [ProducesResponseType<GoodsReceiptDetail>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status422UnprocessableEntity)]

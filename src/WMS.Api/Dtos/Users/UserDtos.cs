@@ -74,7 +74,6 @@ public sealed record CreateUserRequest : IValidatableObject
     public string? AvatarUrl { get; init; }
 
     [Required(ErrorMessage = "RoleIds is required.")]
-    [MinLength(1, ErrorMessage = "User must be assigned to at least one role.")]
     public IReadOnlyList<int> RoleIds { get; init; } = [];
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
@@ -120,7 +119,6 @@ public sealed record UpdateUserRequest : IValidatableObject
     public string? AvatarUrl { get; init; }
 
     [Required(ErrorMessage = "RoleIds is required.")]
-    [MinLength(1, ErrorMessage = "User must be assigned to at least one role.")]
     public IReadOnlyList<int> RoleIds { get; init; } = [];
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)

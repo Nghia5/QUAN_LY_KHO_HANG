@@ -91,7 +91,7 @@ public sealed class GoodsIssuesController(IGoodsIssueService service) : Controll
 
     /// <summary>Approved → Completed: decreases stock and reservation, writes ISSUE movements and audit.</summary>
     [HttpPost("{id:int}/complete")]
-    [WarehousePermission(Permissions.GoodsIssueApprove, WarehouseResource.Issue)]
+    [WarehousePermission(Permissions.GoodsIssueComplete, WarehouseResource.Issue)]
     [ProducesResponseType<GoodsIssueDetail>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<GoodsIssueDetail>> Complete(int id, CancellationToken cancellationToken) =>
