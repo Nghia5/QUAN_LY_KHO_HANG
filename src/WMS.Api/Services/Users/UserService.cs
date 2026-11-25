@@ -1,9 +1,6 @@
-using System.Linq.Expressions;
-using Microsoft.EntityFrameworkCore;
 using WMS.Api.Common;
-using WMS.Api.Data;
+using WMS.Api.Repositories;
 using WMS.Api.Dtos.Common;
-using WMS.Api.Dtos.Roles;
 using WMS.Api.Dtos.Users;
 using WMS.Api.Exceptions;
 using WMS.Api.Models;
@@ -12,119 +9,38 @@ using WMS.Api.Services.Auth;
 namespace WMS.Api.Services.Users;
 
 public sealed class UserService(
-    WmsDbContext dbContext,
+    IUserRepository userRepository,
+    IRoleRepository roleRepository,
     IPasswordHasher passwordHasher,
     ITokenService tokenService,
     ICurrentUser currentUser,
     TimeProvider timeProvider) : IUserService
 {
-    private static readonly Dictionary<string, Expression<Func<User, object?>>> SortFields =
-        QueryableExtensions.SortMap<User>(
-            ("id", u => u.Id),
-            ("username", u => u.Username),
-            ("fullName", u => u.FullName),
-            ("email", u => u.Email),
-            ("createdAt", u => u.CreatedAt),
-            ("isActive", u => u.IsActive));
+    public Task<PagedResult<UserResponse>> SearchAsync(UserQuery query, CancellationToken cancellationToken) =>
+        userRepository.SearchAsync(query, cancellationToken);
 
-    public async Task<PagedResult<UserResponse>> SearchAsync(UserQuery query, CancellationToken cancellationToken)
-    {
-        var queryable = dbContext.Users.AsNoTracking().AsQueryable();
-
-        if (!string.IsNullOrWhiteSpace(query.Keyword))
-        {
-            var keyword = query.Keyword.Trim();
-            queryable = queryable.Where(u =>
-                u.Username.Contains(keyword) ||
-                u.FullName.Contains(keyword) ||
-                u.Email.Contains(keyword));
-        }
-
-        if (query.RoleId.HasValue)
-        {
-            queryable = queryable.Where(u => u.UserRoles.Any(ur => ur.RoleId == query.RoleId.Value));
-        }
-
-        if (query.IsActive.HasValue)
-        {
-            queryable = queryable.Where(u => u.IsActive == query.IsActive.Value);
-        }
-
-        var sorted = queryable.ApplySort(query, SortFields, defaultSort: "id", tieBreaker: u => u.Id);
-
-        var projected = sorted.Select(u => new UserResponse(
-            u.Id,
-            u.Username,
-            u.Email,
-            u.FullName,
-            u.PhoneNumber,
-            u.AvatarUrl,
-            u.IsActive,
-            u.CreatedAt,
-            u.UpdatedAt,
-            u.DeletedAt,
-            u.UserRoles.Select(ur => ur.Role.Name).ToList()));
-
-        return await projected.ToPagedResultAsync(query, cancellationToken);
-    }
-
-    public async Task<UserDetailResponse> GetByIdAsync(int id, CancellationToken cancellationToken)
-    {
-        var user = await dbContext.Users
-            .Include(u => u.UserRoles)
-                .ThenInclude(ur => ur.Role)
-                    .ThenInclude(r => r.RolePermissions)
-                        .ThenInclude(rp => rp.Permission)
-            .SingleOrDefaultAsync(u => u.Id == id, cancellationToken)
-            ?? throw new NotFoundException("User", id);
-
-        var roles = user.UserRoles
-            .Select(ur => new RoleSummaryResponse(ur.Role.Id, ur.Role.Code, ur.Role.Name))
-            .ToList();
-
-        var permissions = user.UserRoles
-            .Where(ur => ur.Role.IsActive)
-            .SelectMany(ur => ur.Role.RolePermissions)
-            .Select(rp => rp.Permission.Code)
-            .Distinct()
-            .ToList();
-
-        return new UserDetailResponse(
-            user.Id,
-            user.Username,
-            user.Email,
-            user.FullName,
-            user.PhoneNumber,
-            user.AvatarUrl,
-            user.IsActive,
-            user.CreatedAt,
-            user.UpdatedAt,
-            user.DeletedAt,
-            user.DeletedBy,
-            roles,
-            permissions);
-    }
+    public async Task<UserDetailResponse> GetByIdAsync(int id, CancellationToken cancellationToken) =>
+        await userRepository.GetDetailByIdAsync(id, cancellationToken)
+        ?? throw new NotFoundException("User", id);
 
     public async Task<UserResponse> CreateAsync(CreateUserRequest request, CancellationToken cancellationToken)
     {
         var username = request.Username.Trim();
         var email = request.Email.Trim().ToLowerInvariant();
 
-        if (await dbContext.Users.AnyAsync(u => u.Username == username, cancellationToken))
+        if (await userRepository.UsernameExistsAsync(username, cancellationToken))
         {
             throw new ConflictException($"Username '{username}' is already in use.");
         }
 
-        if (await dbContext.Users.AnyAsync(u => u.Email == email, cancellationToken))
+        if (await userRepository.EmailExistsAsync(email, null, cancellationToken))
         {
             throw new ConflictException($"Email '{email}' is already in use.");
         }
 
         // Validate roles exist
-        var existingRoleIds = await dbContext.Roles
-            .Where(r => request.RoleIds.Contains(r.Id))
-            .Select(r => r.Id)
-            .ToListAsync(cancellationToken);
+        var roles = await roleRepository.FindByIdsAsync(request.RoleIds, cancellationToken);
+        var existingRoleIds = roles.Select(r => r.Id).ToHashSet();
 
         var invalidRoles = request.RoleIds.Except(existingRoleIds).ToList();
         if (invalidRoles.Count > 0)
@@ -150,13 +66,10 @@ public sealed class UserService(
             }).ToList()
         };
 
-        dbContext.Users.Add(user);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        userRepository.Add(user);
+        await userRepository.SaveChangesAsync(cancellationToken);
 
-        var roleNames = await dbContext.Roles
-            .Where(r => existingRoleIds.Contains(r.Id))
-            .Select(r => r.Name)
-            .ToListAsync(cancellationToken);
+        var roleNames = roles.Select(r => r.Name).ToList();
 
         return new UserResponse(
             user.Id,
@@ -174,21 +87,17 @@ public sealed class UserService(
 
     public async Task<UserResponse> UpdateAsync(int id, UpdateUserRequest request, CancellationToken cancellationToken)
     {
-        var user = await dbContext.Users
-            .Include(u => u.UserRoles)
-            .SingleOrDefaultAsync(u => u.Id == id, cancellationToken)
+        var user = await userRepository.FindAsync(id, cancellationToken)
             ?? throw new NotFoundException("User", id);
 
         var email = request.Email.Trim().ToLowerInvariant();
-        if (email != user.Email && await dbContext.Users.AnyAsync(u => u.Email == email && u.Id != id, cancellationToken))
+        if (email != user.Email && await userRepository.EmailExistsAsync(email, id, cancellationToken))
         {
             throw new ConflictException($"Email '{email}' is already in use by another user.");
         }
 
-        var existingRoleIds = await dbContext.Roles
-            .Where(r => request.RoleIds.Contains(r.Id))
-            .Select(r => r.Id)
-            .ToListAsync(cancellationToken);
+        var roles = await roleRepository.FindByIdsAsync(request.RoleIds, cancellationToken);
+        var existingRoleIds = roles.Select(r => r.Id).ToHashSet();
 
         var invalidRoles = request.RoleIds.Except(existingRoleIds).ToList();
         if (invalidRoles.Count > 0)
@@ -205,9 +114,20 @@ public sealed class UserService(
         user.UpdatedAt = now;
 
         // Synchronize roles
-        user.UserRoles.Clear();
+        foreach (var assignment in user.UserRoles.Where(ur => !existingRoleIds.Contains(ur.RoleId)).ToList())
+        {
+            user.UserRoles.Remove(assignment);
+        }
+
+        var assignedRoles = user.UserRoles.ToDictionary(ur => ur.RoleId);
         foreach (var roleId in existingRoleIds)
         {
+            if (assignedRoles.TryGetValue(roleId, out var assignment))
+            {
+                assignment.AssignedAt = now;
+                continue;
+            }
+
             user.UserRoles.Add(new UserRole
             {
                 UserId = user.Id,
@@ -216,12 +136,9 @@ public sealed class UserService(
             });
         }
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        await userRepository.SaveChangesAsync(cancellationToken);
 
-        var roleNames = await dbContext.Roles
-            .Where(r => existingRoleIds.Contains(r.Id))
-            .Select(r => r.Name)
-            .ToListAsync(cancellationToken);
+        var roleNames = roles.Select(r => r.Name).ToList();
 
         return new UserResponse(
             user.Id,
@@ -239,7 +156,7 @@ public sealed class UserService(
 
     public async Task ChangePasswordAsync(int id, ChangePasswordRequest request, CancellationToken cancellationToken)
     {
-        var user = await dbContext.Users.FindAsync([id], cancellationToken)
+        var user = await userRepository.FindAsync(id, cancellationToken)
             ?? throw new NotFoundException("User", id);
 
         if (!passwordHasher.VerifyPassword(request.CurrentPassword, user.PasswordHash))
@@ -252,27 +169,22 @@ public sealed class UserService(
 
         // Invalidate active sessions on password change
         await tokenService.RevokeAllUserTokensAsync(id, null, cancellationToken);
-        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public async Task AdminResetPasswordAsync(int id, AdminResetPasswordRequest request, CancellationToken cancellationToken)
     {
-        var user = await dbContext.Users.FindAsync([id], cancellationToken)
+        var user = await userRepository.FindAsync(id, cancellationToken)
             ?? throw new NotFoundException("User", id);
 
         user.PasswordHash = passwordHasher.HashPassword(request.NewPassword);
         user.UpdatedAt = timeProvider.GetUtcNow().UtcDateTime;
 
         await tokenService.RevokeAllUserTokensAsync(id, null, cancellationToken);
-        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<UserResponse> SoftDeleteAsync(int id, CancellationToken cancellationToken)
     {
-        var user = await dbContext.Users
-            .Include(u => u.UserRoles)
-                .ThenInclude(ur => ur.Role)
-            .SingleOrDefaultAsync(u => u.Id == id, cancellationToken)
+        var user = await userRepository.FindAsync(id, cancellationToken)
             ?? throw new NotFoundException("User", id);
 
         if (!user.IsActive)
@@ -286,23 +198,19 @@ public sealed class UserService(
 
         // Revoke all tokens immediately so user cannot perform any further authenticated actions
         await tokenService.RevokeAllUserTokensAsync(id, null, cancellationToken);
-        await dbContext.SaveChangesAsync(cancellationToken);
 
         return ToUserResponse(user);
     }
 
     public async Task<UserResponse> RestoreAsync(int id, CancellationToken cancellationToken)
     {
-        var user = await dbContext.Users
-            .Include(u => u.UserRoles)
-                .ThenInclude(ur => ur.Role)
-            .SingleOrDefaultAsync(u => u.Id == id, cancellationToken)
+        var user = await userRepository.FindAsync(id, cancellationToken)
             ?? throw new NotFoundException("User", id);
 
         if (!user.IsActive)
         {
             user.Restore();
-            await dbContext.SaveChangesAsync(cancellationToken);
+            await userRepository.SaveChangesAsync(cancellationToken);
         }
 
         return ToUserResponse(user);

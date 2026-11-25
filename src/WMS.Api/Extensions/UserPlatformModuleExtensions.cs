@@ -1,3 +1,4 @@
+using WMS.Api.Repositories;
 using WMS.Api.Services.Auth;
 using WMS.Api.Services.Files;
 using WMS.Api.Services.Roles;
@@ -12,6 +13,12 @@ public static class UserPlatformModuleExtensions
 {
     public static IServiceCollection AddUserPlatformModule(this IServiceCollection services)
     {
+        services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+        services.AddScoped<IRoleRepository, RoleRepository>();
+        services.AddScoped<IPermissionRepository, PermissionRepository>();
+        services.AddScoped<IUploadedFileRepository, UploadedFileRepository>();
+
         services.AddScoped<IPasswordHasher, PasswordHasher>();
         services.AddScoped<ITokenService, TokenService>();
         services.AddScoped<IAuthService, AuthService>();

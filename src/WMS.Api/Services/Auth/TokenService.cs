@@ -2,12 +2,11 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using WMS.Api.Constants;
-using WMS.Api.Data;
+using WMS.Api.Repositories;
 using WMS.Api.Dtos.Auth;
 using WMS.Api.Exceptions;
 using WMS.Api.Models;
@@ -15,7 +14,8 @@ using WMS.Api.Models;
 namespace WMS.Api.Services.Auth;
 
 public sealed class TokenService(
-    WmsDbContext dbContext,
+    IRefreshTokenRepository refreshTokenRepository,
+    IUserRepository userRepository,
     IConfiguration configuration,
     IOptionsMonitor<JwtBearerOptions> jwtOptions,
     TimeProvider timeProvider) : ITokenService
@@ -25,8 +25,8 @@ public sealed class TokenService(
 
     public async Task<AuthResponse> CreateTokenResponseAsync(User user, string? ipAddress, CancellationToken cancellationToken)
     {
-        var permissions = await GetUserPermissionsAsync(user.Id, cancellationToken);
-        var roleNames = await GetUserRoleNamesAsync(user.Id, cancellationToken);
+        var permissions = await userRepository.GetUserPermissionsAsync(user.Id, cancellationToken);
+        var roleNames = await userRepository.GetUserRoleNamesAsync(user.Id, cancellationToken);
 
         var (accessToken, expiresAt) = GenerateJwtAccessToken(user, permissions);
         var refreshToken = GenerateRefreshTokenString();
@@ -40,8 +40,8 @@ public sealed class TokenService(
             CreatedByIp = ipAddress
         };
 
-        dbContext.RefreshTokens.Add(refreshTokenEntity);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        refreshTokenRepository.Add(refreshTokenEntity);
+        await refreshTokenRepository.SaveChangesAsync(cancellationToken);
 
         var summary = new AuthUserSummary(
             user.Id,
@@ -56,9 +56,7 @@ public sealed class TokenService(
 
     public async Task<AuthResponse> RefreshTokenAsync(string refreshToken, string? ipAddress, CancellationToken cancellationToken)
     {
-        var existingToken = await dbContext.RefreshTokens
-            .Include(t => t.User)
-            .SingleOrDefaultAsync(t => t.Token == refreshToken, cancellationToken)
+        var existingToken = await refreshTokenRepository.FindByTokenAsync(refreshToken, cancellationToken)
             ?? throw new UnauthorizedException("Invalid refresh token.");
 
         if (existingToken.IsRevoked)
@@ -92,13 +90,13 @@ public sealed class TokenService(
             CreatedByIp = ipAddress
         };
 
-        dbContext.RefreshTokens.Add(newRefreshToken);
+        refreshTokenRepository.Add(newRefreshToken);
 
-        var permissions = await GetUserPermissionsAsync(existingToken.UserId, cancellationToken);
-        var roleNames = await GetUserRoleNamesAsync(existingToken.UserId, cancellationToken);
+        var permissions = await userRepository.GetUserPermissionsAsync(existingToken.UserId, cancellationToken);
+        var roleNames = await userRepository.GetUserRoleNamesAsync(existingToken.UserId, cancellationToken);
         var (accessToken, expiresAt) = GenerateJwtAccessToken(existingToken.User, permissions);
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        await refreshTokenRepository.SaveChangesAsync(cancellationToken);
 
         var summary = new AuthUserSummary(
             existingToken.User.Id,
@@ -113,28 +111,19 @@ public sealed class TokenService(
 
     public async Task RevokeTokenAsync(string refreshToken, string? ipAddress, CancellationToken cancellationToken)
     {
-        var token = await dbContext.RefreshTokens
-            .SingleOrDefaultAsync(t => t.Token == refreshToken, cancellationToken);
+        var token = await refreshTokenRepository.FindByTokenAsync(refreshToken, cancellationToken);
 
         if (token is not null && token.IsActive)
         {
             token.Revoke(ipAddress);
-            await dbContext.SaveChangesAsync(cancellationToken);
+            await refreshTokenRepository.SaveChangesAsync(cancellationToken);
         }
     }
 
     public async Task RevokeAllUserTokensAsync(int userId, string? ipAddress, CancellationToken cancellationToken)
     {
-        var activeTokens = await dbContext.RefreshTokens
-            .Where(t => t.UserId == userId && t.RevokedAt == null)
-            .ToListAsync(cancellationToken);
-
-        foreach (var token in activeTokens)
-        {
-            token.Revoke(ipAddress);
-        }
-
-        await dbContext.SaveChangesAsync(cancellationToken);
+        await refreshTokenRepository.StageRevocationsByUserIdAsync(userId, ipAddress, cancellationToken);
+        await refreshTokenRepository.SaveChangesAsync(cancellationToken);
     }
 
     private (string Token, DateTime ExpiresAt) GenerateJwtAccessToken(User user, IReadOnlyList<string> permissions)
@@ -208,18 +197,4 @@ public sealed class TokenService(
     private static string GenerateRefreshTokenString() =>
         Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
 
-    private async Task<IReadOnlyList<string>> GetUserPermissionsAsync(int userId, CancellationToken cancellationToken) =>
-        await dbContext.UserRoles
-            .Where(ur => ur.UserId == userId && ur.Role.IsActive)
-            .SelectMany(ur => ur.Role.RolePermissions)
-            .Select(rp => rp.Permission.Code)
-            .Distinct()
-            .ToListAsync(cancellationToken);
-
-    private async Task<IReadOnlyList<string>> GetUserRoleNamesAsync(int userId, CancellationToken cancellationToken) =>
-        await dbContext.UserRoles
-            .Where(ur => ur.UserId == userId && ur.Role.IsActive)
-            .Select(ur => ur.Role.Name)
-            .Distinct()
-            .ToListAsync(cancellationToken);
 }

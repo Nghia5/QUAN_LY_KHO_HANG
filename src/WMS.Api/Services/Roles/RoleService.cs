@@ -1,5 +1,4 @@
-using Microsoft.EntityFrameworkCore;
-using WMS.Api.Data;
+using WMS.Api.Repositories;
 using WMS.Api.Dtos.Roles;
 using WMS.Api.Exceptions;
 using WMS.Api.Models;
@@ -7,27 +6,20 @@ using WMS.Api.Models;
 namespace WMS.Api.Services.Roles;
 
 public sealed class RoleService(
-    WmsDbContext dbContext,
+    IRoleRepository roleRepository,
+    IPermissionRepository permissionRepository,
     TimeProvider timeProvider) : IRoleService
 {
     public async Task<IReadOnlyList<RoleResponse>> GetAllRolesAsync(CancellationToken cancellationToken)
     {
-        var roles = await dbContext.Roles
-            .AsNoTracking()
-            .Include(r => r.RolePermissions)
-                .ThenInclude(rp => rp.Permission)
-            .OrderBy(r => r.Name)
-            .ToListAsync(cancellationToken);
+        var roles = await roleRepository.ListAsync(cancellationToken);
 
         return roles.Select(ToRoleResponse).ToList();
     }
 
     public async Task<RoleResponse> GetRoleByIdAsync(int id, CancellationToken cancellationToken)
     {
-        var role = await dbContext.Roles
-            .Include(r => r.RolePermissions)
-                .ThenInclude(rp => rp.Permission)
-            .SingleOrDefaultAsync(r => r.Id == id, cancellationToken)
+        var role = await roleRepository.FindAsync(id, cancellationToken)
             ?? throw new NotFoundException("Role", id);
 
         return ToRoleResponse(role);
@@ -36,14 +28,12 @@ public sealed class RoleService(
     public async Task<RoleResponse> CreateRoleAsync(CreateRoleRequest request, CancellationToken cancellationToken)
     {
         var code = request.Code.Trim().ToUpperInvariant();
-        if (await dbContext.Roles.AnyAsync(r => r.Code == code, cancellationToken))
+        if (await roleRepository.CodeExistsAsync(code, cancellationToken))
         {
             throw new ConflictException($"Role code '{code}' already exists.");
         }
 
-        var validPermissions = await dbContext.Permissions
-            .Where(p => request.PermissionIds.Contains(p.Id))
-            .ToListAsync(cancellationToken);
+        var validPermissions = await permissionRepository.FindByIdsAsync(request.PermissionIds, cancellationToken);
 
         var invalidIds = request.PermissionIds.Except(validPermissions.Select(p => p.Id)).ToList();
         if (invalidIds.Count > 0)
@@ -60,27 +50,23 @@ public sealed class RoleService(
             CreatedAt = timeProvider.GetUtcNow().UtcDateTime,
             RolePermissions = validPermissions.Select(p => new RolePermission
             {
-                PermissionId = p.Id
+                PermissionId = p.Id,
+                Permission = p
             }).ToList()
         };
 
-        dbContext.Roles.Add(role);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        roleRepository.Add(role);
+        await roleRepository.SaveChangesAsync(cancellationToken);
 
         return ToRoleResponse(role);
     }
 
     public async Task<RoleResponse> UpdateRoleAsync(int id, UpdateRoleRequest request, CancellationToken cancellationToken)
     {
-        var role = await dbContext.Roles
-            .Include(r => r.RolePermissions)
-                .ThenInclude(rp => rp.Permission)
-            .SingleOrDefaultAsync(r => r.Id == id, cancellationToken)
+        var role = await roleRepository.FindAsync(id, cancellationToken)
             ?? throw new NotFoundException("Role", id);
 
-        var validPermissions = await dbContext.Permissions
-            .Where(p => request.PermissionIds.Contains(p.Id))
-            .ToListAsync(cancellationToken);
+        var validPermissions = await permissionRepository.FindByIdsAsync(request.PermissionIds, cancellationToken);
 
         var invalidIds = request.PermissionIds.Except(validPermissions.Select(p => p.Id)).ToList();
         if (invalidIds.Count > 0)
@@ -92,28 +78,32 @@ public sealed class RoleService(
         role.Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim();
         role.IsActive = request.IsActive;
 
-        role.RolePermissions.Clear();
-        foreach (var p in validPermissions)
+        var permissionIds = validPermissions.Select(p => p.Id).ToHashSet();
+        foreach (var assignment in role.RolePermissions.Where(rp => !permissionIds.Contains(rp.PermissionId)).ToList())
+        {
+            role.RolePermissions.Remove(assignment);
+        }
+
+        var assignedIds = role.RolePermissions.Select(rp => rp.PermissionId).ToHashSet();
+        foreach (var permission in validPermissions.Where(p => !assignedIds.Contains(p.Id)))
         {
             role.RolePermissions.Add(new RolePermission
             {
                 RoleId = role.Id,
-                PermissionId = p.Id
+                PermissionId = permission.Id,
+                Permission = permission
             });
         }
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        await roleRepository.SaveChangesAsync(cancellationToken);
 
         return ToRoleResponse(role);
     }
 
     public async Task<IReadOnlyList<PermissionResponse>> GetAllPermissionsAsync(CancellationToken cancellationToken) =>
-        await dbContext.Permissions
-            .AsNoTracking()
-            .OrderBy(p => p.Group)
-            .ThenBy(p => p.Code)
+        (await permissionRepository.ListAsync(cancellationToken))
             .Select(p => new PermissionResponse(p.Id, p.Code, p.Group, p.Description))
-            .ToListAsync(cancellationToken);
+            .ToList();
 
     private static RoleResponse ToRoleResponse(Role role) =>
         new(role.Id,

@@ -1,13 +1,12 @@
-using Microsoft.EntityFrameworkCore;
 using WMS.Api.Common;
-using WMS.Api.Data;
+using WMS.Api.Repositories;
 using WMS.Api.Dtos.Auth;
 using WMS.Api.Exceptions;
 
 namespace WMS.Api.Services.Auth;
 
 public sealed class AuthService(
-    WmsDbContext dbContext,
+    IUserRepository userRepository,
     IPasswordHasher passwordHasher,
     ITokenService tokenService,
     ICurrentUser currentUser) : IAuthService
@@ -16,10 +15,7 @@ public sealed class AuthService(
     {
         var identifier = request.UsernameOrEmail.Trim();
 
-        var user = await dbContext.Users
-            .SingleOrDefaultAsync(
-                u => u.Username == identifier || u.Email == identifier,
-                cancellationToken);
+        var user = await userRepository.FindByIdentifierAsync(identifier, cancellationToken);
 
         if (user is null || !passwordHasher.VerifyPassword(request.Password, user.PasswordHash))
         {
@@ -54,12 +50,7 @@ public sealed class AuthService(
         var userId = currentUser.UserId
             ?? throw new UnauthorizedException("You must be authenticated to view your profile.");
 
-        var user = await dbContext.Users
-            .Include(u => u.UserRoles)
-                .ThenInclude(ur => ur.Role)
-                    .ThenInclude(r => r.RolePermissions)
-                        .ThenInclude(rp => rp.Permission)
-            .SingleOrDefaultAsync(u => u.Id == userId, cancellationToken)
+        var user = await userRepository.GetWithPermissionsAsync(userId, cancellationToken)
             ?? throw new NotFoundException("User", userId);
 
         var activeRoles = user.UserRoles

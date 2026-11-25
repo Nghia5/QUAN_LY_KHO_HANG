@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.EntityFrameworkCore;
-using WMS.Api.Data;
+using WMS.Api.Repositories;
 using WMS.Api.Dtos.Files;
 using WMS.Api.Exceptions;
 using WMS.Api.Models;
@@ -8,7 +7,7 @@ using WMS.Api.Models;
 namespace WMS.Api.Services.Files;
 
 public sealed class FileStorageService(
-    WmsDbContext dbContext,
+    IUploadedFileRepository uploadedFileRepository,
     IWebHostEnvironment environment,
     IConfiguration configuration,
     TimeProvider timeProvider) : IFileStorageService
@@ -43,8 +42,8 @@ public sealed class FileStorageService(
             UploadedAt = timeProvider.GetUtcNow().UtcDateTime
         };
 
-        dbContext.UploadedFiles.Add(uploadedFile);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        uploadedFileRepository.Add(uploadedFile);
+        await uploadedFileRepository.SaveChangesAsync(cancellationToken);
 
         var fileUrl = $"/api/files/{uploadedFile.Id}";
         return new UploadFileResponse(
@@ -83,8 +82,8 @@ public sealed class FileStorageService(
             UploadedAt = timeProvider.GetUtcNow().UtcDateTime
         };
 
-        dbContext.UploadedFiles.Add(uploadedFile);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        uploadedFileRepository.Add(uploadedFile);
+        await uploadedFileRepository.SaveChangesAsync(cancellationToken);
 
         var fileUrl = $"/api/files/{uploadedFile.Id}";
         return new UploadFileResponse(
@@ -99,8 +98,7 @@ public sealed class FileStorageService(
 
     public async Task<FileDownloadInfo> GetFileDownloadAsync(Guid fileId, CancellationToken cancellationToken)
     {
-        var fileRecord = await dbContext.UploadedFiles
-            .SingleOrDefaultAsync(f => f.Id == fileId, cancellationToken)
+        var fileRecord = await uploadedFileRepository.FindAsync(fileId, cancellationToken)
             ?? throw new NotFoundException("File", fileId);
 
         var physicalPath = Path.Combine(BaseStorageDirectory, fileRecord.FilePath.Replace('/', Path.DirectorySeparatorChar));
@@ -115,8 +113,7 @@ public sealed class FileStorageService(
 
     public async Task DeleteFileAsync(Guid fileId, CancellationToken cancellationToken)
     {
-        var fileRecord = await dbContext.UploadedFiles
-            .SingleOrDefaultAsync(f => f.Id == fileId, cancellationToken)
+        var fileRecord = await uploadedFileRepository.FindAsync(fileId, cancellationToken)
             ?? throw new NotFoundException("File", fileId);
 
         var physicalPath = Path.Combine(BaseStorageDirectory, fileRecord.FilePath.Replace('/', Path.DirectorySeparatorChar));
@@ -125,7 +122,7 @@ public sealed class FileStorageService(
             File.Delete(physicalPath);
         }
 
-        dbContext.UploadedFiles.Remove(fileRecord);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        uploadedFileRepository.Remove(fileRecord);
+        await uploadedFileRepository.SaveChangesAsync(cancellationToken);
     }
 }
