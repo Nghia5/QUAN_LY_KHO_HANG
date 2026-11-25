@@ -14,7 +14,8 @@ public sealed class UserService(
     IPasswordHasher passwordHasher,
     ITokenService tokenService,
     ICurrentUser currentUser,
-    TimeProvider timeProvider) : IUserService
+    TimeProvider timeProvider,
+    AdminAccountGuard adminGuard) : IUserService
 {
     public Task<PagedResult<UserResponse>> SearchAsync(UserQuery query, CancellationToken cancellationToken) =>
         userRepository.SearchAsync(query, cancellationToken);
@@ -87,6 +88,7 @@ public sealed class UserService(
 
     public async Task<UserResponse> UpdateAsync(int id, UpdateUserRequest request, CancellationToken cancellationToken)
     {
+        await using var transaction = await adminGuard.BeginAsync(cancellationToken);
         var user = await userRepository.FindAsync(id, cancellationToken)
             ?? throw new NotFoundException("User", id);
 
@@ -105,6 +107,7 @@ public sealed class UserService(
             throw new BusinessRuleException($"Role IDs not found: {string.Join(", ", invalidRoles)}.");
         }
 
+        await adminGuard.EnsureCanRemoveAsync(user, existingRoleIds, cancellationToken);
         var now = timeProvider.GetUtcNow().UtcDateTime;
 
         user.FullName = request.FullName.Trim();
@@ -137,6 +140,7 @@ public sealed class UserService(
         }
 
         await userRepository.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         var roleNames = roles.Select(r => r.Name).ToList();
 
@@ -184,6 +188,7 @@ public sealed class UserService(
 
     public async Task<UserResponse> SoftDeleteAsync(int id, CancellationToken cancellationToken)
     {
+        await using var transaction = await adminGuard.BeginAsync(cancellationToken);
         var user = await userRepository.FindAsync(id, cancellationToken)
             ?? throw new NotFoundException("User", id);
 
@@ -193,11 +198,13 @@ public sealed class UserService(
             return ToUserResponse(user);
         }
 
+        await adminGuard.EnsureCanRemoveAsync(user, null, cancellationToken);
         var deletedByUserId = currentUser.UserId ?? 0;
         user.SoftDelete(deletedByUserId);
 
         // Revoke all tokens immediately so user cannot perform any further authenticated actions
         await tokenService.RevokeAllUserTokensAsync(id, null, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         return ToUserResponse(user);
     }

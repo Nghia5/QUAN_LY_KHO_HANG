@@ -12,7 +12,8 @@ public sealed class FileStorageService(
     IWebHostEnvironment environment,
     IConfiguration configuration,
     TimeProvider timeProvider,
-    DocumentAttachmentAccess attachmentAccess) : IFileStorageService
+    DocumentAttachmentAccess attachmentAccess,
+    ILogger<FileStorageService> logger) : IFileStorageService
 {
     private string BaseStorageDirectory =>
         configuration["Storage:UploadDirectory"]
@@ -65,6 +66,7 @@ public sealed class FileStorageService(
             throw new BusinessRuleException("A document type and ID are required.");
         }
 
+        await using var transaction = await attachmentAccess.BeginWriteAsync(documentType, documentId, cancellationToken);
         await attachmentAccess.RequireAsync(documentType, documentId, write: true, cancellationToken);
         var documentsDir = Path.Combine(BaseStorageDirectory, "documents");
         Directory.CreateDirectory(documentsDir);
@@ -72,11 +74,6 @@ public sealed class FileStorageService(
         var extension = Path.GetExtension(request.File.FileName).ToLowerInvariant();
         var storedName = $"{Guid.NewGuid():N}{extension}";
         var physicalPath = Path.Combine(documentsDir, storedName);
-
-        await using (var fileStream = new FileStream(physicalPath, FileMode.Create, FileAccess.Write, FileShare.None))
-        {
-            await request.File.CopyToAsync(fileStream, cancellationToken);
-        }
 
         var relativePath = Path.Combine("documents", storedName).Replace('\\', '/');
         var uploadedFile = new UploadedFile
@@ -92,8 +89,31 @@ public sealed class FileStorageService(
             UploadedAt = timeProvider.GetUtcNow().UtcDateTime
         };
 
-        uploadedFileRepository.Add(uploadedFile);
-        await uploadedFileRepository.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await using (var fileStream = new FileStream(physicalPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            {
+                await request.File.CopyToAsync(fileStream, cancellationToken);
+            }
+
+            uploadedFileRepository.Add(uploadedFile);
+            await uploadedFileRepository.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            try
+            {
+                File.Delete(physicalPath);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                logger.LogWarning(exception, "Could not remove an incomplete attachment {FileId}.", uploadedFile.Id);
+            }
+
+            throw;
+        }
+
+        await transaction.CommitAsync(cancellationToken);
 
         var fileUrl = $"/api/files/{uploadedFile.Id}";
         return new UploadFileResponse(

@@ -2,8 +2,10 @@ using Microsoft.EntityFrameworkCore;
 using WMS.Api.Common;
 using WMS.Api.Data;
 using WMS.Api.Exceptions;
+using WMS.Api.Models;
 using WMS.Api.Models.Documents;
 using WMS.Api.Services.Audit;
+using WMS.Api.Services.Files;
 
 namespace WMS.Api.Services.Documents;
 
@@ -141,9 +143,18 @@ public abstract class DocumentServiceBase<TDocument, TDetail>(
         var document = await FindAsync(id, cancellationToken);
         workflow.EnsureCan(document, DocumentAction.Delete);
 
+        var type = DocumentAttachmentAccess.TypeOf(document);
+        await using var transaction = await DocumentAttachmentAccess.BeginWriteAsync(dbContext, type, id, cancellationToken);
+        if (await dbContext.Set<UploadedFile>().AnyAsync(
+            file => file.DocumentType == type && file.DocumentId == id, cancellationToken))
+        {
+            throw new ConflictException("Remove the document attachments before deleting the document.");
+        }
+
         audit.Log(AuditEntity, document.Id, "DELETED", new { document.DocumentNo });
         dbContext.Remove(document);
         await SaveAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
     }
 
     protected async Task<TDocument> FindAsync(int id, CancellationToken cancellationToken) =>

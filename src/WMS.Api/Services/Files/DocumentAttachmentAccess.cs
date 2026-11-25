@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using WMS.Api.Authorization;
 using WMS.Api.Constants;
 using WMS.Api.Data;
@@ -9,6 +10,24 @@ namespace WMS.Api.Services.Files;
 
 public sealed class DocumentAttachmentAccess(WmsDbContext db, WarehouseAccess access)
 {
+    internal Task<IDbContextTransaction> BeginWriteAsync(
+        WarehouseDocumentType type, int id, CancellationToken cancellationToken) =>
+        BeginWriteAsync(db, type, id, cancellationToken);
+
+    internal static Task<IDbContextTransaction> BeginWriteAsync(
+        WmsDbContext db, WarehouseDocumentType type, int id, CancellationToken cancellationToken) =>
+        DatabaseWriteLock.BeginAsync(db, $"wms:attachment:{type}:{id}", cancellationToken);
+
+    internal static WarehouseDocumentType TypeOf(WarehouseDocument document) => document switch
+    {
+        GoodsReceipt => WarehouseDocumentType.Receipt,
+        GoodsIssue => WarehouseDocumentType.Issue,
+        StockTransfer => WarehouseDocumentType.Transfer,
+        Stocktake => WarehouseDocumentType.Stocktake,
+        StockAdjustment => WarehouseDocumentType.Adjustment,
+        _ => throw new InvalidOperationException("Unknown warehouse document type.")
+    };
+
     public async Task RequireAsync(
         WarehouseDocumentType type, int id, bool write, CancellationToken cancellationToken)
     {

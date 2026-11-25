@@ -2,6 +2,7 @@ using WMS.Api.Repositories;
 using WMS.Api.Dtos.Roles;
 using WMS.Api.Exceptions;
 using WMS.Api.Models;
+using WMS.Api.Services.Users;
 
 namespace WMS.Api.Services.Roles;
 
@@ -65,6 +66,7 @@ public sealed class RoleService(
     {
         var role = await roleRepository.FindAsync(id, cancellationToken)
             ?? throw new NotFoundException("Role", id);
+        AdminAccountGuard.EnsureCanDeactivate(role, request.IsActive);
 
         var validPermissions = await permissionRepository.FindByIdsAsync(request.PermissionIds, cancellationToken);
 
