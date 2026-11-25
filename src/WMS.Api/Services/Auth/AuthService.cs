@@ -35,13 +35,15 @@ public sealed class AuthService(
 
     public async Task RevokeTokenAsync(RevokeTokenRequest request, string? ipAddress, CancellationToken cancellationToken)
     {
+        var userId = currentUser.UserId ?? throw new UnauthorizedException();
+
         if (!string.IsNullOrWhiteSpace(request.RefreshToken))
         {
-            await tokenService.RevokeTokenAsync(request.RefreshToken, ipAddress, cancellationToken);
+            await tokenService.RevokeTokenAsync(request.RefreshToken, userId, ipAddress, cancellationToken);
         }
-        else if (currentUser.UserId.HasValue)
+        else
         {
-            await tokenService.RevokeAllUserTokensAsync(currentUser.UserId.Value, ipAddress, cancellationToken);
+            await tokenService.RevokeAllUserTokensAsync(userId, ipAddress, cancellationToken);
         }
     }
 

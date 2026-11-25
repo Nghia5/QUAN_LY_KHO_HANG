@@ -8,7 +8,7 @@ public interface IFileStorageService
 
     Task<UploadFileResponse> UploadDocumentAsync(UploadDocumentRequest request, int? userId, CancellationToken cancellationToken);
 
-    Task<FileDownloadInfo> GetFileDownloadAsync(Guid fileId, CancellationToken cancellationToken);
+    Task<FileDownloadInfo> GetFileDownloadAsync(Guid fileId, int userId, CancellationToken cancellationToken);
 
-    Task DeleteFileAsync(Guid fileId, CancellationToken cancellationToken);
+    Task DeleteFileAsync(Guid fileId, int userId, CancellationToken cancellationToken);
 }

@@ -1,3 +1,7 @@
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.EntityFrameworkCore;
 using WMS.Api.Authorization;
 using WMS.Api.Common;
@@ -17,8 +21,40 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
 
 // Authentication & Authorization with permission policies
-builder.Services.AddAuthentication().AddJwtBearer();
-builder.Services.AddAuthorizationBuilder().AddPermissionPolicies();
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
+{
+    var key = builder.Configuration["Jwt:Key"];
+    if (string.IsNullOrWhiteSpace(key))
+    {
+        return;
+    }
+
+    var issuer = builder.Configuration["Jwt:Issuer"];
+    var audience = builder.Configuration["Jwt:Audience"];
+    var keyBytes = Encoding.UTF8.GetBytes(key);
+    if (keyBytes.Length < 32 || string.IsNullOrWhiteSpace(issuer) || string.IsNullOrWhiteSpace(audience))
+    {
+        throw new InvalidOperationException("Configure Jwt:Key (at least 32 bytes), Jwt:Issuer and Jwt:Audience.");
+    }
+
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        IssuerSigningKey = new SymmetricSecurityKey(keyBytes),
+        ValidIssuer = issuer,
+        ValidAudience = audience,
+        ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
+        ValidateIssuerSigningKey = true,
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true
+    };
+});
+builder.Services.AddAuthorizationBuilder()
+    .AddPermissionPolicies()
+    .AddPolicy(ActiveAdminRequirement.PolicyName, policy => policy
+        .RequireAuthenticatedUser()
+        .AddRequirements(new ActiveAdminRequirement()));
+builder.Services.AddScoped<IAuthorizationHandler, ActiveAdminHandler>();
 
 // Exception handling
 builder.Services.AddExceptionHandler<AppExceptionHandler>();

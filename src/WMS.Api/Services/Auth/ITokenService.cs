@@ -9,7 +9,7 @@ public interface ITokenService
 
     Task<AuthResponse> RefreshTokenAsync(string refreshToken, string? ipAddress, CancellationToken cancellationToken);
 
-    Task RevokeTokenAsync(string refreshToken, string? ipAddress, CancellationToken cancellationToken);
+    Task RevokeTokenAsync(string refreshToken, int userId, string? ipAddress, CancellationToken cancellationToken);
 
     Task RevokeAllUserTokensAsync(int userId, string? ipAddress, CancellationToken cancellationToken);
 }

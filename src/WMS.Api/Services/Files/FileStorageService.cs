@@ -96,10 +96,9 @@ public sealed class FileStorageService(
             uploadedFile.UploadedAt);
     }
 
-    public async Task<FileDownloadInfo> GetFileDownloadAsync(Guid fileId, CancellationToken cancellationToken)
+    public async Task<FileDownloadInfo> GetFileDownloadAsync(Guid fileId, int userId, CancellationToken cancellationToken)
     {
-        var fileRecord = await uploadedFileRepository.FindAsync(fileId, cancellationToken)
-            ?? throw new NotFoundException("File", fileId);
+        var fileRecord = await FindOwnedFileAsync(fileId, userId, cancellationToken);
 
         var physicalPath = Path.Combine(BaseStorageDirectory, fileRecord.FilePath.Replace('/', Path.DirectorySeparatorChar));
         if (!File.Exists(physicalPath))
@@ -111,10 +110,9 @@ public sealed class FileStorageService(
         return new FileDownloadInfo(stream, fileRecord.ContentType, fileRecord.OriginalFileName);
     }
 
-    public async Task DeleteFileAsync(Guid fileId, CancellationToken cancellationToken)
+    public async Task DeleteFileAsync(Guid fileId, int userId, CancellationToken cancellationToken)
     {
-        var fileRecord = await uploadedFileRepository.FindAsync(fileId, cancellationToken)
-            ?? throw new NotFoundException("File", fileId);
+        var fileRecord = await FindOwnedFileAsync(fileId, userId, cancellationToken);
 
         var physicalPath = Path.Combine(BaseStorageDirectory, fileRecord.FilePath.Replace('/', Path.DirectorySeparatorChar));
         if (File.Exists(physicalPath))
@@ -124,5 +122,16 @@ public sealed class FileStorageService(
 
         uploadedFileRepository.Remove(fileRecord);
         await uploadedFileRepository.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task<UploadedFile> FindOwnedFileAsync(Guid fileId, int userId, CancellationToken cancellationToken)
+    {
+        var file = await uploadedFileRepository.FindAsync(fileId, cancellationToken);
+        if (file is null || file.UploadedBy != userId)
+        {
+            throw new NotFoundException("File", fileId);
+        }
+
+        return file;
     }
 }

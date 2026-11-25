@@ -24,6 +24,7 @@ public interface IUserRepository
 
     Task<User?> FindByIdentifierAsync(string identifier, CancellationToken cancellationToken);
     Task<User?> GetWithPermissionsAsync(int id, CancellationToken cancellationToken);
+    Task<bool> IsActiveAdminAsync(int userId, CancellationToken cancellationToken);
     Task<IReadOnlyList<string>> GetUserPermissionsAsync(int userId, CancellationToken cancellationToken);
     Task<IReadOnlyList<string>> GetUserRoleNamesAsync(int userId, CancellationToken cancellationToken);
 
@@ -181,6 +182,11 @@ public sealed class UserRepository(WmsDbContext dbContext) : IUserRepository
                     .ThenInclude(r => r.RolePermissions)
                         .ThenInclude(rp => rp.Permission)
             .SingleOrDefaultAsync(u => u.Id == id, cancellationToken);
+
+    public Task<bool> IsActiveAdminAsync(int userId, CancellationToken cancellationToken) =>
+        dbContext.Users.AnyAsync(user => user.Id == userId && user.IsActive &&
+            user.UserRoles.Any(assignment => assignment.Role.IsActive && assignment.Role.Code == "ADMIN"),
+            cancellationToken);
 
     public async Task<IReadOnlyList<string>> GetUserPermissionsAsync(int userId, CancellationToken cancellationToken) =>
         await dbContext.UserRoles

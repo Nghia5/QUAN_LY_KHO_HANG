@@ -1,6 +1,5 @@
 using System.Security.Claims;
 using System.Security.Cryptography;
-using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
@@ -16,7 +15,6 @@ namespace WMS.Api.Services.Auth;
 public sealed class TokenService(
     IRefreshTokenRepository refreshTokenRepository,
     IUserRepository userRepository,
-    IConfiguration configuration,
     IOptionsMonitor<JwtBearerOptions> jwtOptions,
     TimeProvider timeProvider) : ITokenService
 {
@@ -109,11 +107,11 @@ public sealed class TokenService(
         return new AuthResponse(accessToken, newRefreshTokenString, expiresAt, summary);
     }
 
-    public async Task RevokeTokenAsync(string refreshToken, string? ipAddress, CancellationToken cancellationToken)
+    public async Task RevokeTokenAsync(string refreshToken, int userId, string? ipAddress, CancellationToken cancellationToken)
     {
         var token = await refreshTokenRepository.FindByTokenAsync(refreshToken, cancellationToken);
 
-        if (token is not null && token.IsActive)
+        if (token is not null && token.UserId == userId && token.IsActive)
         {
             token.Revoke(ipAddress);
             await refreshTokenRepository.SaveChangesAsync(cancellationToken);
@@ -166,32 +164,18 @@ public sealed class TokenService(
 
     private (SigningCredentials Credentials, string? Issuer, string? Audience) ResolveSigningParameters()
     {
-        // 1. Try explicit configuration key
-        var configuredKey = configuration["Jwt:Key"];
-        var issuer = configuration["Jwt:Issuer"];
-        var audience = configuration["Jwt:Audience"];
-
-        if (!string.IsNullOrWhiteSpace(configuredKey))
-        {
-            var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(configuredKey));
-            return (new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256), issuer, audience);
-        }
-
-        // 2. Try JwtBearerOptions (e.g. configured via dotnet user-jwts)
         var parameters = jwtOptions.Get(JwtBearerDefaults.AuthenticationScheme).TokenValidationParameters;
-        var key = parameters.IssuerSigningKeys?.FirstOrDefault() ?? parameters.IssuerSigningKey;
+        var key = parameters.IssuerSigningKey ?? parameters.IssuerSigningKeys?.FirstOrDefault();
+        var issuer = parameters.ValidIssuer ?? parameters.ValidIssuers?.FirstOrDefault();
+        var audience = parameters.ValidAudience ?? parameters.ValidAudiences?.FirstOrDefault();
 
-        if (key is not null)
+        if (key is not SymmetricSecurityKey || key.KeySize < 256 ||
+            string.IsNullOrWhiteSpace(issuer) || string.IsNullOrWhiteSpace(audience))
         {
-            return (new SigningCredentials(key, SecurityAlgorithms.HmacSha256),
-                parameters.ValidIssuer ?? issuer,
-                parameters.ValidAudiences?.FirstOrDefault() ?? parameters.ValidAudience ?? audience);
+            throw new InvalidOperationException("JWT signing requires a symmetric key of at least 256 bits, an issuer and an audience.");
         }
 
-        // 3. Fallback dev key so the system always runs safely even before secrets are set
-        const string FallbackSecret = "WMS_Secret_Key_For_Jwt_Token_Generation_Default_2026_Must_Be_Long_Enough";
-        var fallbackKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(FallbackSecret));
-        return (new SigningCredentials(fallbackKey, SecurityAlgorithms.HmacSha256), "WMS.Api", "WMS.Client");
+        return (new SigningCredentials(key, SecurityAlgorithms.HmacSha256), issuer, audience);
     }
 
     private static string GenerateRefreshTokenString() =>
