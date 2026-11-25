@@ -16,6 +16,15 @@ public class WmsDbContext(DbContextOptions<WmsDbContext> options) : DbContext(op
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<WarehouseRoleAssignment>(assignment =>
+        {
+            assignment.ToTable("WarehouseRoleAssignments");
+            assignment.HasKey(a => new { a.UserId, a.WarehouseId, a.RoleId });
+            assignment.HasOne(a => a.User).WithMany().HasForeignKey(a => a.UserId);
+            assignment.HasOne(a => a.Warehouse).WithMany().HasForeignKey(a => a.WarehouseId);
+            assignment.HasOne(a => a.Role).WithMany().HasForeignKey(a => a.RoleId);
+        });
+
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(WmsDbContext).Assembly);
         base.OnModelCreating(modelBuilder);
     }

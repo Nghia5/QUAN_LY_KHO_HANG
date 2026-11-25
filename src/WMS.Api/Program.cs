@@ -8,6 +8,8 @@ using WMS.Api.Common;
 using WMS.Api.Data;
 using WMS.Api.Extensions;
 using WMS.Api.Middleware;
+using WMS.Api.Repositories;
+using WMS.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -62,6 +64,13 @@ builder.Services.AddProblemDetails();
 
 // User & Platform module
 builder.Services.AddUserPlatformModule();
+builder.Services.AddScoped<WarehouseAccess>();
+builder.Services.AddWarehouseModule();
+builder.Services.AddScoped<IProductService, ProductService>();
+builder.Services.AddScoped<ISupplierRepository, SupplierRepository>();
+builder.Services.AddScoped<ISupplierService, SupplierService>();
+builder.Services.AddExceptionHandler<ProductSkuConflictExceptionHandler>();
+builder.Services.AddExceptionHandler<ProductInUseExceptionHandler>();
 
 // OpenAPI
 builder.Services.AddOpenApi();
