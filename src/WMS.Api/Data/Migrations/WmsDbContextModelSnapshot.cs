@@ -1220,7 +1220,12 @@ namespace WMS.Api.Data.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("RefreshTokens", (string)null);
+                    b.ToTable("RefreshTokens", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_RefreshTokens_ExpiresAfterCreation", "[ExpiresAt] > [CreatedAt]");
+
+                            t.HasCheckConstraint("CK_RefreshTokens_RevokedAfterCreation", "[RevokedAt] IS NULL OR [RevokedAt] >= [CreatedAt]");
+                        });
                 });
 
             modelBuilder.Entity("WMS.Api.Models.Role", b =>

@@ -43,7 +43,8 @@ public sealed class RefreshToken : IValidatableObject
 
     public void Revoke(string? ipAddress = null, string? replacedBy = null)
     {
-        RevokedAt = DateTime.UtcNow;
+        var now = DateTime.UtcNow;
+        RevokedAt = now < CreatedAt ? CreatedAt : now;
         RevokedByIp = ipAddress;
         ReplacedByToken = replacedBy;
     }

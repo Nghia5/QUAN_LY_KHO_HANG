@@ -8,7 +8,12 @@ public sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refresh
 {
     public void Configure(EntityTypeBuilder<RefreshToken> builder)
     {
-        builder.ToTable("RefreshTokens");
+        builder.ToTable("RefreshTokens", table =>
+        {
+            table.HasCheckConstraint("CK_RefreshTokens_ExpiresAfterCreation", "[ExpiresAt] > [CreatedAt]");
+            table.HasCheckConstraint("CK_RefreshTokens_RevokedAfterCreation",
+                "[RevokedAt] IS NULL OR [RevokedAt] >= [CreatedAt]");
+        });
 
         builder.HasKey(token => token.Id);
 

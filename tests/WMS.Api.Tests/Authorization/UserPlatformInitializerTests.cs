@@ -9,6 +9,7 @@ using WMS.Api.Dtos.Roles;
 using WMS.Api.Dtos.Users;
 using WMS.Api.Exceptions;
 using WMS.Api.Extensions;
+using WMS.Api.Models;
 using WMS.Api.Repositories;
 using WMS.Api.Services.Roles;
 using WMS.Api.Services.Users;
@@ -73,6 +74,22 @@ public sealed class UserPlatformInitializerTests(SqlServerDatabaseFixture fixtur
             $"UPDATE dbo.Users SET DeletedAt = SYSUTCDATETIME(), DeletedBy = NULL WHERE Id = {secondAdmin.Id}"));
         Assert.Equal(547, invalidState.Number);
         Assert.Contains("CK_Users_SoftDeleteState", invalidState.Message);
+
+        var createdAt = TimeProvider.System.GetUtcNow().UtcDateTime;
+        var refreshToken = new RefreshToken
+        {
+            UserId = admin.Id, Token = "integration-test-token", CreatedAt = createdAt, ExpiresAt = createdAt.AddDays(7)
+        };
+        db.RefreshTokens.Add(refreshToken);
+        await db.SaveChangesAsync();
+        var invalidExpiry = await Assert.ThrowsAsync<SqlException>(() => db.Database.ExecuteSqlInterpolatedAsync(
+            $"UPDATE dbo.RefreshTokens SET ExpiresAt = CreatedAt WHERE Id = {refreshToken.Id}"));
+        Assert.Equal(547, invalidExpiry.Number);
+        Assert.Contains("CK_RefreshTokens_ExpiresAfterCreation", invalidExpiry.Message);
+        var invalidRevocation = await Assert.ThrowsAsync<SqlException>(() => db.Database.ExecuteSqlInterpolatedAsync(
+            $"UPDATE dbo.RefreshTokens SET RevokedAt = DATEADD(second, -1, CreatedAt) WHERE Id = {refreshToken.Id}"));
+        Assert.Equal(547, invalidRevocation.Number);
+        Assert.Contains("CK_RefreshTokens_RevokedAfterCreation", invalidRevocation.Message);
 
         await Task.WhenAll(RemoveAdminAsync(admin.Id), RemoveAdminAsync(secondAdmin.Id));
         Assert.Equal(1, await db.Users.CountAsync(user => user.IsActive &&
