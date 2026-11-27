@@ -86,6 +86,7 @@ public sealed class FileStorageService(
             UploadedBy = userId,
             DocumentType = documentType,
             DocumentId = documentId,
+            Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
             UploadedAt = timeProvider.GetUtcNow().UtcDateTime
         };
 
@@ -123,7 +124,10 @@ public sealed class FileStorageService(
             fileUrl,
             uploadedFile.ContentType,
             uploadedFile.FileSize,
-            uploadedFile.UploadedAt);
+            uploadedFile.UploadedAt)
+        {
+            Description = uploadedFile.Description
+        };
     }
 
     public async Task<FileDownloadInfo> GetFileDownloadAsync(Guid fileId, int userId, CancellationToken cancellationToken)
@@ -160,7 +164,10 @@ public sealed class FileStorageService(
         await attachmentAccess.RequireAsync(type, id, write: false, cancellationToken);
         var files = await uploadedFileRepository.ListForDocumentAsync(type, id, cancellationToken);
         return files.Select(file => new DocumentAttachmentResponse(
-            file.Id, file.OriginalFileName, file.FileSize, file.UploadedAt, $"/api/files/{file.Id}")).ToList();
+            file.Id, file.OriginalFileName, file.FileSize, file.UploadedAt, $"/api/files/{file.Id}")
+        {
+            Description = file.Description
+        }).ToList();
     }
 
     private async Task<UploadedFile> FindAccessibleFileAsync(

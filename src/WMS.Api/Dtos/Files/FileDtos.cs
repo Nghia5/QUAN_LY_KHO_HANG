@@ -70,7 +70,7 @@ public sealed record UploadDocumentRequest : IValidatableObject
     [Range(1, int.MaxValue)]
     public int? DocumentId { get; init; }
 
-    [MaxLength(255, ErrorMessage = "Description cannot exceed 255 characters.")]
+    [MaxLength(UploadedFile.MaxDescriptionLength, ErrorMessage = "Description cannot exceed 255 characters.")]
     public string? Description { get; init; }
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
@@ -136,7 +136,10 @@ public sealed record UploadFileResponse(
     string FileUrl,
     string ContentType,
     long FileSize,
-    DateTime UploadedAt);
+    DateTime UploadedAt)
+{
+    public string? Description { get; init; }
+}
 
 /// <summary>Internal transport object for file download streaming.</summary>
 public sealed record FileDownloadInfo(
@@ -144,4 +147,7 @@ public sealed record FileDownloadInfo(
     string ContentType,
     string FileName);
 
-public sealed record DocumentAttachmentResponse(Guid Id, string FileName, long Size, DateTime UploadedAt, string FileUrl);
+public sealed record DocumentAttachmentResponse(Guid Id, string FileName, long Size, DateTime UploadedAt, string FileUrl)
+{
+    public string? Description { get; init; }
+}

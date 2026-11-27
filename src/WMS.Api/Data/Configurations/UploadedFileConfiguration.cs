@@ -32,6 +32,8 @@ public sealed class UploadedFileConfiguration : IEntityTypeConfiguration<Uploade
             .HasMaxLength(UploadedFile.MaxContentTypeLength)
             .IsRequired();
 
+        builder.Property(file => file.Description).HasMaxLength(UploadedFile.MaxDescriptionLength);
+
         builder.Property(file => file.UploadedAt)
             .HasDefaultValueSql("SYSUTCDATETIME()")
             .HasConversion(UtcDateTimeConverters.Required);

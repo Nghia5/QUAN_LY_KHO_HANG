@@ -1,5 +1,9 @@
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 using WMS.Api.Authorization;
 using WMS.Api.Constants;
+using WMS.Api.Dtos.Files;
 using WMS.Api.Dtos.Warehouses;
 using WMS.Api.Exceptions;
 using WMS.Api.Models;
@@ -67,6 +71,33 @@ public sealed class WarehouseAccessTests(SqlServerDatabaseFixture fixture) : ICl
         } });
         await db.SaveChangesAsync();
         await attachmentAccess.RequireAsync(WarehouseDocumentType.Transfer, transfer.Id, write: true, default);
+
+        var storageDirectory = Directory.CreateTempSubdirectory("wms-attachment-");
+        try
+        {
+            var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Storage:UploadDirectory"] = storageDirectory.FullName
+            }).Build();
+            var storage = new FileStorageService(new UploadedFileRepository(db), null!, config, TimeProvider.System,
+                attachmentAccess, NullLogger<FileStorageService>.Instance);
+            using var content = new MemoryStream([1]);
+            var response = await storage.UploadDocumentAsync(new UploadDocumentRequest
+            {
+                File = new FormFile(content, 0, 1, "File", "test.pdf")
+                    { Headers = new HeaderDictionary(), ContentType = "application/pdf" },
+                DocumentType = WarehouseDocumentType.Transfer,
+                DocumentId = transfer.Id,
+                Description = "  Transfer manifest  "
+            }, user.Id, default);
+            Assert.Equal("Transfer manifest", response.Description);
+            var attachments = await storage.ListDocumentAttachmentsAsync(WarehouseDocumentType.Transfer, transfer.Id, default);
+            Assert.Equal(response.Description, Assert.Single(attachments).Description);
+        }
+        finally
+        {
+            storageDirectory.Delete(recursive: true);
+        }
 
         transfer.Status = DocumentStatus.Completed;
         await db.SaveChangesAsync();

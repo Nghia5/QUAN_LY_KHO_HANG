@@ -1434,6 +1434,10 @@ namespace WMS.Api.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<string>("Description")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
                     b.Property<int?>("DocumentId")
                         .HasColumnType("int");
 
@@ -2165,7 +2169,7 @@ namespace WMS.Api.Data.Migrations
                         .IsRequired();
 
                     b.HasOne("WMS.Api.Models.User", "User")
-                        .WithMany()
+                        .WithMany("WarehouseRoleAssignments")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -2232,6 +2236,8 @@ namespace WMS.Api.Data.Migrations
                     b.Navigation("UploadedFiles");
 
                     b.Navigation("UserRoles");
+
+                    b.Navigation("WarehouseRoleAssignments");
                 });
 
             modelBuilder.Entity("WMS.Api.Models.WarehouseLocation", b =>

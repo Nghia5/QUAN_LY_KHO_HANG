@@ -10,6 +10,7 @@ public sealed class UploadedFile : IValidatableObject
 {
     public const int MaxOriginalFileNameLength = 255;
     public const int MaxContentTypeLength = 100;
+    public const int MaxDescriptionLength = 255;
 
     [Key]
     public Guid Id { get; set; } = Guid.NewGuid();
@@ -38,6 +39,9 @@ public sealed class UploadedFile : IValidatableObject
     public User? Uploader { get; set; }
     public WarehouseDocumentType? DocumentType { get; set; }
     public int? DocumentId { get; set; }
+
+    [MaxLength(MaxDescriptionLength)]
+    public string? Description { get; set; }
 
     public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
 
