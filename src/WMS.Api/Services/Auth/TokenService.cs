@@ -26,7 +26,7 @@ public sealed class TokenService(
         var permissions = await userRepository.GetUserPermissionsAsync(user.Id, cancellationToken);
         var roleNames = await userRepository.GetUserRoleNamesAsync(user.Id, cancellationToken);
 
-        var (accessToken, expiresAt) = GenerateJwtAccessToken(user, permissions);
+        var (accessToken, expiresAt) = GenerateJwtAccessToken(user, permissions, roleNames);
         var refreshToken = GenerateRefreshTokenString();
 
         var refreshTokenEntity = new RefreshToken
@@ -92,7 +92,7 @@ public sealed class TokenService(
 
         var permissions = await userRepository.GetUserPermissionsAsync(existingToken.UserId, cancellationToken);
         var roleNames = await userRepository.GetUserRoleNamesAsync(existingToken.UserId, cancellationToken);
-        var (accessToken, expiresAt) = GenerateJwtAccessToken(existingToken.User, permissions);
+        var (accessToken, expiresAt) = GenerateJwtAccessToken(existingToken.User, permissions, roleNames);
 
         await refreshTokenRepository.SaveChangesAsync(cancellationToken);
 
@@ -124,7 +124,7 @@ public sealed class TokenService(
         await refreshTokenRepository.SaveChangesAsync(cancellationToken);
     }
 
-    private (string Token, DateTime ExpiresAt) GenerateJwtAccessToken(User user, IReadOnlyList<string> permissions)
+    private (string Token, DateTime ExpiresAt) GenerateJwtAccessToken(User user, IReadOnlyList<string> permissions, IReadOnlyList<string>? roleNames = null)
     {
         var now = timeProvider.GetUtcNow().UtcDateTime;
         var expiresAt = now.AddMinutes(AccessTokenMinutes);
@@ -143,6 +143,14 @@ public sealed class TokenService(
         foreach (var permission in permissions)
         {
             claims.Add(new Claim(Permissions.ClaimType, permission));
+        }
+
+        if (roleNames is not null)
+        {
+            foreach (var role in roleNames)
+            {
+                claims.Add(new Claim(ClaimTypes.Role, role));
+            }
         }
 
         var tokenDescriptor = new SecurityTokenDescriptor

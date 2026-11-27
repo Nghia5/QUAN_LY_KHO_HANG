@@ -89,7 +89,8 @@ public sealed class DocumentWorkflow(ICurrentUser currentUser, TimeProvider time
 
     public void EnsureCan(WarehouseDocument document, DocumentAction action)
     {
-        if ((action is DocumentAction.Edit or DocumentAction.Delete or DocumentAction.Submit or DocumentAction.Reopen ||
+        if (!currentUser.IsAdmin &&
+            (action is DocumentAction.Edit or DocumentAction.Delete or DocumentAction.Submit or DocumentAction.Reopen ||
             action == DocumentAction.Cancel && DocumentStatuses.BeforeApproval.Contains(document.Status)) &&
             document.CreatedBy is int ownerId && ownerId != currentUser.UserId)
         {
