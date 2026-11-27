@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Table, Button, Space, Input, Tag, Modal, Form, Select, message, Popconfirm } from 'antd';
+import { Table, Button, Space, Input, Tag, Modal, Form, Select, Popconfirm, App } from 'antd';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import type { UserResponse, RoleSummary } from '../../types';
 import { usersApi, rolesApi } from '../../api/services';
 
 export default function UsersPage() {
+  const { message } = App.useApp();
   const [data, setData] = useState<UserResponse[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);

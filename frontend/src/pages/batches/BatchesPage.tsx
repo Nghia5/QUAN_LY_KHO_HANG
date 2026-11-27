@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Table, Input, Select, Space, Button, Tag, message, Tabs } from 'antd';
+import { Table, Input, Select, Space, Button, Tag, Tabs, App } from 'antd';
 import { ReloadOutlined, WarningOutlined } from '@ant-design/icons';
 import type { BatchResponse, ExpiryAlertRow, WarehouseResponse } from '../../types';
 import { batchesApi, warehousesApi, extractItems } from '../../api/services';
@@ -10,6 +10,7 @@ const expiryLabels: Record<number, { text: string; color: string }> = {
 };
 
 export default function BatchesPage() {
+  const { message } = App.useApp();
   const [data, setData] = useState<BatchResponse[]>([]);
   const [alerts, setAlerts] = useState<ExpiryAlertRow[]>([]);
   const [total, setTotal] = useState(0);

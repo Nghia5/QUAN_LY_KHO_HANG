@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Table, Button, Input, Tag, Modal, Form, Select, message } from 'antd';
+import { Table, Button, Input, Tag, Modal, Form, Select, App } from 'antd';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import type { RoleResponse, PermissionResponse } from '../../types';
 import { rolesApi } from '../../api/services';
 
 export default function RolesPage() {
+  const { message } = App.useApp();
   const [data, setData] = useState<RoleResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);

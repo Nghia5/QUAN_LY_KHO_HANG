@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Table, Input, Select, Space, Button, Tag, message } from 'antd';
+import { Table, Input, Select, Space, Button, Tag, App } from 'antd';
 import { ReloadOutlined } from '@ant-design/icons';
 import type { StockMovementResponse, WarehouseResponse } from '../../types';
 import { stockMovementsApi, warehousesApi, extractItems } from '../../api/services';
@@ -11,6 +11,7 @@ const movementTypeLabels: Record<number, { text: string; color: string }> = {
 };
 
 export default function StockMovementsPage() {
+  const { message } = App.useApp();
   const [data, setData] = useState<StockMovementResponse[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);

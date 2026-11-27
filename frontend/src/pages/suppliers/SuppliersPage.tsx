@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Table, Button, Space, Input, Tag, Modal, Form, Switch, message, Popconfirm } from 'antd';
+import { Table, Button, Space, Input, Tag, Modal, Form, Switch, Popconfirm, App } from 'antd';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import type { SupplierResponse } from '../../types';
 import { suppliersApi } from '../../api/services';
 
 export default function SuppliersPage() {
+  const { message } = App.useApp();
   const [data, setData] = useState<SupplierResponse[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);

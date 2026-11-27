@@ -1,4 +1,4 @@
-import { Button, Space, Popconfirm, Input, message, Tag } from 'antd';
+import { Button, Space, Popconfirm, Input, Tag, App } from 'antd';
 import { useState } from 'react';
 import type { DocumentAction, DocumentStatus } from '../types';
 
@@ -22,6 +22,7 @@ interface Props {
 }
 
 export function DocumentActions({ actions, availableActions, onAction }: Props) {
+  const { message } = App.useApp();
   const [reason, setReason] = useState('');
   const [acting, setActing] = useState('');
 
