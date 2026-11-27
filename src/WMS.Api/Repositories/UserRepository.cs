@@ -70,10 +70,15 @@ public sealed class UserRepository(WmsDbContext dbContext) : IUserRepository
                 u.Email.Contains(keyword));
         }
 
-        if (query.RoleId.HasValue)
+        if (query.WarehouseId is int warehouseId)
         {
-            var roleId = query.RoleId.Value;
-            users = users.Where(u => u.UserRoles.Any(ur => ur.RoleId == roleId));
+            users = users.Where(u => u.WarehouseRoleAssignments.Any(a =>
+                a.WarehouseId == warehouseId && (query.RoleId == null || a.RoleId == query.RoleId)));
+        }
+        else if (query.RoleId is int roleId)
+        {
+            users = users.Where(u => u.UserRoles.Any(ur => ur.RoleId == roleId) ||
+                u.WarehouseRoleAssignments.Any(a => a.RoleId == roleId));
         }
 
         if (query.IsActive.HasValue)
@@ -94,7 +99,13 @@ public sealed class UserRepository(WmsDbContext dbContext) : IUserRepository
                 u.CreatedAt,
                 u.UpdatedAt,
                 u.DeletedAt,
-                u.UserRoles.Select(ur => ur.Role.Name).ToList()))
+                u.UserRoles.Select(ur => ur.Role.Name).ToList())
+            {
+                WarehouseRoles = u.WarehouseRoleAssignments
+                    .OrderBy(a => a.WarehouseId).ThenBy(a => a.RoleId)
+                    .Select(a => new UserWarehouseRoleResponse(a.WarehouseId, a.Warehouse.Code, a.RoleId, a.Role.Code, a.Role.Name))
+                    .ToList()
+            })
             .ToPagedResultAsync(query, cancellationToken);
     }
 
@@ -119,6 +130,12 @@ public sealed class UserRepository(WmsDbContext dbContext) : IUserRepository
             .OrderBy(c => c)
             .ToList();
 
+        var warehouseRoles = await dbContext.Set<WarehouseRoleAssignment>()
+            .Where(a => a.UserId == id)
+            .OrderBy(a => a.WarehouseId).ThenBy(a => a.RoleId)
+            .Select(a => new UserWarehouseRoleResponse(a.WarehouseId, a.Warehouse.Code, a.RoleId, a.Role.Code, a.Role.Name))
+            .ToListAsync(cancellationToken);
+
         return new UserDetailResponse(
             user.Id,
             user.Username,
@@ -132,7 +149,10 @@ public sealed class UserRepository(WmsDbContext dbContext) : IUserRepository
             user.DeletedAt,
             user.DeletedBy,
             roles,
-            permissions);
+            permissions)
+        {
+            WarehouseRoles = warehouseRoles
+        };
     }
 
     public Task<User?> FindAsync(int id, CancellationToken cancellationToken) =>

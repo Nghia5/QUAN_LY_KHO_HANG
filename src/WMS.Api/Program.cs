@@ -76,6 +76,7 @@ builder.Services.AddExceptionHandler<ProductInUseExceptionHandler>();
 
 // OpenAPI
 builder.Services.AddOpenApi();
+builder.Services.AddSwaggerGen(options => options.AddJwtBearerSecurity());
 
 var app = builder.Build();
 
@@ -91,6 +92,9 @@ app.UseExceptionHandler();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.UseSwagger();
+    app.UseSwaggerUI(options =>
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "WMS API v1"));
 }
 
 app.UseHttpsRedirection();

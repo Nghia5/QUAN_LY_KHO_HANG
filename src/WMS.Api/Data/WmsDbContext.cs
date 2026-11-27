@@ -20,7 +20,7 @@ public class WmsDbContext(DbContextOptions<WmsDbContext> options) : DbContext(op
         {
             assignment.ToTable("WarehouseRoleAssignments");
             assignment.HasKey(a => new { a.UserId, a.WarehouseId, a.RoleId });
-            assignment.HasOne(a => a.User).WithMany().HasForeignKey(a => a.UserId);
+            assignment.HasOne(a => a.User).WithMany(user => user.WarehouseRoleAssignments).HasForeignKey(a => a.UserId);
             assignment.HasOne(a => a.Warehouse).WithMany().HasForeignKey(a => a.WarehouseId);
             assignment.HasOne(a => a.Role).WithMany().HasForeignKey(a => a.RoleId);
         });

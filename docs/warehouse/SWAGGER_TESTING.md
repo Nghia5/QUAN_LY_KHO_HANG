@@ -23,60 +23,23 @@ Enum gửi dạng **tên** (`"Zone"`, `"Damaged"`, `"Fefo"`...).
 
 ## 0. Cài đặt và lấy token
 
-### Cài đặt một lần trên mỗi máy
+### Kiểm tra database Stage 7
 
-Chạy trong `src/WMS.Api` (PowerShell):
+Cấu hình chuỗi kết nối và JWT cho môi trường Development bằng .NET User Secrets. Xem [hướng dẫn phân quyền](ACCESS_CONTROL.md) để chạy migration, tạo tài khoản mẫu và phân công vai trò theo kho.
 
-```powershell
-# 1. Chuỗi kết nối SQL Server của máy bạn (không commit, lưu trong user-secrets)
-dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Server=localhost\MSSQLSERVER01;Database=WMS;Trusted_Connection=True;TrustServerCertificate=True"
-
-# 2. Tạo khóa ký JWT cho môi trường dev (tạo appsettings.Development.json - đã gitignore)
-dotnet user-jwts create
-
-# 3. Tạo/cập nhật database
-dotnet ef database update
-```
-
-> Nếu `dotnet user-jwts create` báo thiếu `appsettings.Development.json`, tạo file đó với nội dung `{}` rồi chạy lại.
-
-### Mỗi lần test
-
-1. Chạy API: `dotnet run --launch-profile http` (trong `src/WMS.Api`).
+1. Từ thư mục gốc, chạy `dotnet run --project src/WMS.Api --launch-profile http`.
 2. Mở **http://localhost:5237/swagger**.
-3. Lấy token: `POST /api/dev/token` → **Try it out** → body:
-   - Toàn quyền: `{}`
-   - Chỉ một số quyền (để thử lỗi 403): `{ "userId": 2, "permissions": ["INVENTORY_VIEW"] }`
-   → **Execute** → copy giá trị `token`.
-4. Bấm **Authorize** (góc trên phải) → dán token (không gõ chữ `Bearer`) → **Authorize** → **Close**.
-5. Gọi các API bằng **Try it out → Execute**.
+3. Gọi `POST /api/auth/login` bằng tài khoản thử nghiệm. Sao chép `accessToken` từ phản hồi.
+4. Bấm **Authorize**, dán `accessToken` và xác nhận. Với `stage7.staff`, gọi `GET /api/inventories` với `keyword=S7-SKU-01` để xem tồn mẫu tại `S7-MAIN`.
 
-`/api/dev/token` chỉ hoạt động khi `ASPNETCORE_ENVIRONMENT=Development`; môi trường khác trả 404.
-Khi module Login của Người 3 xong, dùng token đăng nhập thật thay cho endpoint này.
+Dùng `stage7.staff` để lập và gửi phiếu, `stage7.manager` để duyệt và hoàn tất, và `stage7.admin` để quản trị tài khoản và danh mục. Khi đổi tài khoản, chọn **Authorize** → **Logout** rồi dán token mới.
 
-### Chứng từ có duyệt: cần 2 người
-
-Người tạo phiếu **không được tự duyệt** (four-eyes). Dùng 2 token:
-
-| Vai trò | Token | Làm gì |
-|---|---|---|
-| Nhân viên | `{ "userId": 7 }` | tạo, sửa, `submit` |
-| Quản lý | `{ "userId": 8 }` | `approve`, `reject`, `complete` |
-
-Đổi người = lấy token mới → **Authorize** → **Logout** → dán token mới.
-Muốn tự duyệt khi demo, thêm vào `appsettings.Development.json`:
-
-```json
-"Warehouse": { "AllowSelfApproval": true }
-```
-
-Mỗi phiếu trả về `availableActions`: danh sách thao tác **được phép ở trạng thái hiện tại** — nhìn vào đó để biết bước tiếp theo.
 
 ---
 
 ## 1. Dữ liệu mẫu dùng chung
 
-Tạo một lần, các phần sau dùng lại (token toàn quyền `{}`).
+Tạo dữ liệu một lần bằng tài khoản có quyền tương ứng. Dùng Admin để quản lý danh mục và tài khoản được phân công để thực hiện nghiệp vụ kho.
 
 1. **Sản phẩm** – `POST /api/products`:
    ```json
@@ -97,10 +60,6 @@ Tạo một lần, các phần sau dùng lại (token toàn quyền `{}`).
 4. **Nhà cung cấp** – `POST /api/suppliers`: `{ "code": "NCC01", "name": "Công ty ABC" }` → `supplierId`.
 5. **Có hàng trong kho**: làm phần 6 (phiếu nhập) với 100 sản phẩm vào `binId`.
 
-> Nạp tồn nhanh không qua phiếu (chỉ Development): `POST /api/dev/stock-changes` — body là **mảng**:
-> `[ { "productId": 1, "warehouseId": 1, "locationId": 4, "quantity": 50, "movementType": "AdjustmentIn", "note": "seed" } ]`
-> `movementType` tăng tồn: `Receipt`, `TransferIn`, `AdjustmentIn`, `StocktakeIn` (quantity dương);
-> giảm tồn: `Issue`, `TransferOut`, `AdjustmentOut`, `StocktakeOut` (quantity âm, ví dụ `-5`).
 
 ---
 
@@ -160,7 +119,7 @@ Không có API sửa số lượng trực tiếp: tồn chỉ thay đổi qua ph
 | 2 | `?movementType=Issue&from=2026-11-01T00:00:00Z&to=2026-12-31T00:00:00Z` | lọc theo loại + thời gian |
 | 3 | `?referenceType=GOODS_ISSUE&referenceId={issueId}` | các biến động của 1 phiếu |
 | 4 | `GET /api/stock-movements/report?warehouseId={warehouseId}&from=2026-11-01T00:00:00Z&to=2026-12-01T00:00:00Z` | báo cáo **Nhập – Xuất – Tồn**: tồn đầu, nhập, xuất, tồn cuối theo sản phẩm |
-| 5 | `POST /api/dev/stock-changes` body `[ { ..., "quantity": -9999, "movementType": "Issue" } ]` | **422** không đủ tồn (không bao giờ âm) |
+| 5 | Duyệt phiếu xuất có số lượng lớn hơn tồn khả dụng | **422** và tồn kho giữ nguyên |
 
 Biến động **không sửa/xóa được** (chặn ở EF + trigger DB) — không có API PUT/DELETE.
 
@@ -315,7 +274,7 @@ Luồng: **Draft → submit → approve (áp dụng ngay và Completed)**. Bắt
 | HTTP | Ý nghĩa |
 |---|---|
 | 400 | Dữ liệu gửi lên sai định dạng / thiếu trường (xem `errors`) |
-| 401 | Chưa Authorize hoặc token hết hạn (8 giờ) |
+| 401 | Chưa Authorize hoặc token hết hạn (60 phút) |
 | 403 | Token thiếu quyền cần thiết |
 | 404 | Không tìm thấy (hoặc vị trí không thuộc kho trong URL) |
 | 409 | Trùng mã / còn dữ liệu phụ thuộc nên không xóa được / dữ liệu vừa bị người khác sửa |

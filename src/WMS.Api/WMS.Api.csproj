@@ -4,6 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>WMS.Api-9c680119-a95e-4764-b86b-6e0ae3b39dda</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>

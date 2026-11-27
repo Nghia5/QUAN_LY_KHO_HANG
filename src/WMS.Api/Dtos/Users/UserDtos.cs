@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 using WMS.Api.Dtos.Common;
 using WMS.Api.Dtos.Roles;
 
@@ -9,24 +10,35 @@ public sealed record UserQuery : PagedRequest, IValidatableObject
 {
     public static readonly string[] SortableFields = ["id", "username", "fullName", "email", "createdAt", "isActive"];
 
-    [Range(1, int.MaxValue, ErrorMessage = "Page must be greater than or equal to 1.")]
-    public new int Page { get; init; } = 1;
-
-    [Range(1, MaxPageSize, ErrorMessage = "PageSize must be between 1 and 100.")]
-    public new int PageSize { get; init; } = 20;
-
-    [MaxLength(200, ErrorMessage = "Keyword cannot exceed 200 characters.")]
-    public new string? Keyword { get; init; }
-
-    [RegularExpression("^(?i)(asc|desc)$", ErrorMessage = "SortDir must be 'asc' or 'desc'.")]
-    public new string? SortDir { get; init; }
-
     public int? RoleId { get; init; }
+    public int? WarehouseId { get; init; }
 
     public bool? IsActive { get; init; }
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
+        if (Page < 1)
+        {
+            yield return new ValidationResult("Page must be greater than or equal to 1.", [nameof(Page)]);
+        }
+
+        if (PageSize is < 1 or > MaxPageSize)
+        {
+            yield return new ValidationResult("PageSize must be between 1 and 100.", [nameof(PageSize)]);
+        }
+
+        if (Keyword?.Length > 200)
+        {
+            yield return new ValidationResult("Keyword cannot exceed 200 characters.", [nameof(Keyword)]);
+        }
+
+        if (!string.IsNullOrEmpty(SortDir) &&
+            !SortDir.Equals("asc", StringComparison.OrdinalIgnoreCase) &&
+            !SortDir.Equals("desc", StringComparison.OrdinalIgnoreCase))
+        {
+            yield return new ValidationResult("SortDir must be 'asc' or 'desc'.", [nameof(SortDir)]);
+        }
+
         if (SortBy is not null && !SortableFields.Contains(SortBy, StringComparer.OrdinalIgnoreCase))
         {
             yield return new ValidationResult(
@@ -39,6 +51,11 @@ public sealed record UserQuery : PagedRequest, IValidatableObject
             yield return new ValidationResult(
                 "RoleId must be greater than 0.",
                 [nameof(RoleId)]);
+        }
+
+        if (WarehouseId is <= 0)
+        {
+            yield return new ValidationResult("WarehouseId must be greater than 0.", [nameof(WarehouseId)]);
         }
     }
 }
@@ -189,7 +206,13 @@ public sealed record UserResponse(
     DateTime CreatedAt,
     DateTime? UpdatedAt,
     DateTime? DeletedAt,
-    IReadOnlyList<string> Roles);
+    IReadOnlyList<string> Roles)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<UserWarehouseRoleResponse>? WarehouseRoles { get; init; }
+}
+
+public sealed record UserWarehouseRoleResponse(int WarehouseId, string WarehouseCode, int RoleId, string RoleCode, string RoleName);
 
 /// <summary>Comprehensive user details for single entity view.</summary>
 public sealed record UserDetailResponse(
@@ -205,7 +228,10 @@ public sealed record UserDetailResponse(
     DateTime? DeletedAt,
     int? DeletedBy,
     IReadOnlyList<RoleSummaryResponse> Roles,
-    IReadOnlyList<string> Permissions);
+    IReadOnlyList<string> Permissions)
+{
+    public IReadOnlyList<UserWarehouseRoleResponse> WarehouseRoles { get; init; } = [];
+}
 
 /// <summary>Compact user summary for dropdowns or minimal references.</summary>
 public sealed record UserSummaryResponse(

@@ -15,7 +15,7 @@ public static class SwaggerJwtExtensions
             Type = SecuritySchemeType.Http,
             Scheme = "bearer",
             BearerFormat = "JWT",
-            Description = "Paste the token only (no 'Bearer ' prefix). In Development, get one from POST /api/dev/token."
+            Description = "Use POST /api/auth/login, then paste the accessToken without the 'Bearer ' prefix."
         });
 
         options.AddSecurityRequirement(document => new OpenApiSecurityRequirement

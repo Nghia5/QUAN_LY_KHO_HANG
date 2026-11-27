@@ -54,6 +54,7 @@ public sealed class User : IValidatableObject
 
     // Navigation properties
     public ICollection<UserRole> UserRoles { get; set; } = [];
+    public ICollection<WarehouseRoleAssignment> WarehouseRoleAssignments { get; set; } = [];
     public ICollection<RefreshToken> RefreshTokens { get; set; } = [];
     public ICollection<UploadedFile> UploadedFiles { get; set; } = [];
 
