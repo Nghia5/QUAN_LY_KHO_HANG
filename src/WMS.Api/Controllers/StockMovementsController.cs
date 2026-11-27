@@ -1,3 +1,4 @@
+using WMS.Api.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WMS.Api.Constants;
@@ -13,13 +14,14 @@ namespace WMS.Api.Controllers;
 /// movements are created only by warehouse documents and can never be edited or deleted.
 /// </summary>
 [ApiController]
+[Authorize]
 [Route("api/stock-movements")]
 [Produces("application/json")]
-[Authorize(Policy = Permissions.StockMovementView)]
 public sealed class StockMovementsController(IStockMovementRepository repository) : ControllerBase
 {
     /// <summary>Searches movement history (newest first by default).</summary>
     [HttpGet]
+    [WarehousePermission(Permissions.StockMovementView)]
     [ProducesResponseType<PagedResult<StockMovementResponse>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<PagedResult<StockMovementResponse>>> Search(
@@ -28,6 +30,7 @@ public sealed class StockMovementsController(IStockMovementRepository repository
         Ok(await repository.SearchAsync(query, cancellationToken));
 
     [HttpGet("{id:long}")]
+    [WarehousePermission(Permissions.StockMovementView, WarehouseResource.Movement)]
     [ProducesResponseType<StockMovementResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<StockMovementResponse>> GetById(long id, CancellationToken cancellationToken) =>
@@ -38,6 +41,7 @@ public sealed class StockMovementsController(IStockMovementRepository repository
     /// per product and warehouse.
     /// </summary>
     [HttpGet("report")]
+    [WarehousePermission(Permissions.StockMovementView)]
     [ProducesResponseType<PagedResult<StockReportRow>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<PagedResult<StockReportRow>>> Report(

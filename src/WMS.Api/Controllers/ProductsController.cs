@@ -1,3 +1,6 @@
+using WMS.Api.Authorization;
+using WMS.Api.Constants;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WMS.Api.Dtos;
 using WMS.Api.Services;
@@ -5,11 +8,13 @@ using WMS.Api.Services;
 namespace WMS.Api.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/products")]
 public sealed class ProductsController(IProductService productService) : ControllerBase
 {
     /// <summary>Gets all products.</summary>
     [HttpGet]
+    [CatalogPermission(Permissions.ProductView, allowWarehouseGrant: true)]
     [ProducesResponseType<IReadOnlyList<ProductResponse>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<ProductResponse>>> GetAll(
         CancellationToken cancellationToken)
@@ -20,6 +25,7 @@ public sealed class ProductsController(IProductService productService) : Control
 
     /// <summary>Gets a product by ID.</summary>
     [HttpGet("{id:int}", Name = nameof(GetById))]
+    [CatalogPermission(Permissions.ProductView, allowWarehouseGrant: true)]
     [ProducesResponseType<ProductResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ProductResponse>> GetById(
@@ -32,6 +38,7 @@ public sealed class ProductsController(IProductService productService) : Control
 
     /// <summary>Creates a product.</summary>
     [HttpPost]
+    [CatalogPermission(Permissions.ProductManage)]
     [ProducesResponseType<ProductResponse>(StatusCodes.Status201Created)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<ProductResponse>> Create(
@@ -44,6 +51,7 @@ public sealed class ProductsController(IProductService productService) : Control
 
     /// <summary>Updates a product.</summary>
     [HttpPut("{id:int}")]
+    [CatalogPermission(Permissions.ProductManage)]
     [ProducesResponseType<ProductResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
@@ -58,6 +66,7 @@ public sealed class ProductsController(IProductService productService) : Control
 
     /// <summary>Deletes a product.</summary>
     [HttpDelete("{id:int}")]
+    [CatalogPermission(Permissions.ProductManage)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]

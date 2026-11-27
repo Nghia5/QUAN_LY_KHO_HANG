@@ -1,3 +1,4 @@
+using WMS.Api.Authorization;
 using System.Linq.Expressions;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -10,7 +11,7 @@ using WMS.Api.Models;
 
 namespace WMS.Api.Repositories;
 
-public sealed class WarehouseRepository(WmsDbContext dbContext) : IWarehouseRepository
+public sealed class WarehouseRepository(WmsDbContext dbContext, WarehouseAccess? access = null) : IWarehouseRepository
 {
     private static readonly IReadOnlyDictionary<string, Expression<Func<Warehouse, object?>>> SortMap =
         QueryableExtensions.SortMap<Warehouse>(
@@ -23,7 +24,7 @@ public sealed class WarehouseRepository(WmsDbContext dbContext) : IWarehouseRepo
         WarehouseQuery query,
         CancellationToken cancellationToken)
     {
-        var warehouses = dbContext.Set<Warehouse>().AsNoTracking();
+        var warehouses = access?.Filter(dbContext.Set<Warehouse>().AsNoTracking(), w => w.Id) ?? dbContext.Set<Warehouse>().AsNoTracking();
 
         if (!string.IsNullOrWhiteSpace(query.Keyword))
         {

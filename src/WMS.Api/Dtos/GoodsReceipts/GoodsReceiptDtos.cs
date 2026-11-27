@@ -1,3 +1,4 @@
+using WMS.Api.Authorization;
 using WMS.Api.Dtos.Common;
 using WMS.Api.Dtos.Documents;
 using WMS.Api.Models.Documents;
@@ -42,7 +43,7 @@ public interface IGoodsReceiptPayload
 }
 
 /// <summary>Creates a Draft receipt. The warehouse cannot be changed afterwards.</summary>
-public sealed record CreateGoodsReceiptRequest : IGoodsReceiptPayload
+public sealed record CreateGoodsReceiptRequest : IGoodsReceiptPayload, IWarehouseRequest
 {
     public int WarehouseId { get; init; }
 

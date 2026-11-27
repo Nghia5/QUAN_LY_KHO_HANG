@@ -1,3 +1,4 @@
+using WMS.Api.Authorization;
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using WMS.Api.Common;
@@ -30,7 +31,7 @@ public interface IGoodsReceiptRepository
     Task<int> CountOpenByLocationAsync(int locationId, CancellationToken cancellationToken);
 }
 
-public sealed class GoodsReceiptRepository(WmsDbContext dbContext) : IGoodsReceiptRepository
+public sealed class GoodsReceiptRepository(WmsDbContext dbContext, WarehouseAccess? access = null) : IGoodsReceiptRepository
 {
     private static readonly DocumentStatus[] OpenStatuses = DocumentStatuses.Open;
 
@@ -46,7 +47,7 @@ public sealed class GoodsReceiptRepository(WmsDbContext dbContext) : IGoodsRecei
 
     public Task<PagedResult<GoodsReceiptSummary>> SearchAsync(GoodsReceiptQuery query, CancellationToken cancellationToken)
     {
-        var receipts = Receipts;
+        var receipts = access?.Filter(Receipts, d => d.WarehouseId) ?? Receipts;
 
         if (query.WarehouseId is { } warehouseId)
         {

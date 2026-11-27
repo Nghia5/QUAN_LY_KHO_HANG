@@ -1,3 +1,4 @@
+using WMS.Api.Authorization;
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using WMS.Api.Common;
@@ -30,7 +31,7 @@ public sealed record PickRow(int LocationId, string LocationCode, decimal Quanti
 
 public sealed record PickLot(int BatchId, string BatchCode, DateOnly? ManufactureDate, DateOnly? ExpiryDate, DateTime CreatedAt, decimal Quantity);
 
-public sealed class BatchRepository(WmsDbContext dbContext) : IBatchRepository
+public sealed class BatchRepository(WmsDbContext dbContext, WarehouseAccess? access = null) : IBatchRepository
 {
     private static readonly IReadOnlyDictionary<string, Expression<Func<Batch, object?>>> SortMap =
         QueryableExtensions.SortMap<Batch>(
@@ -77,10 +78,17 @@ public sealed class BatchRepository(WmsDbContext dbContext) : IBatchRepository
         }
 
         var warehouseId = query.WarehouseId;
+        var allowed = access?.WarehouseIds;
+        if (allowed is not null)
+        {
+            batches = batches.Where(batch => batch.Lots.Any(lot =>
+                allowed.Contains(lot.Inventory!.WarehouseId) && (warehouseId == null || lot.Inventory.WarehouseId == warehouseId)));
+        }
         if (query.HasStock == true)
         {
             batches = batches.Where(batch => batch.Lots.Any(lot =>
-                lot.Quantity > 0 && (warehouseId == null || lot.Inventory!.WarehouseId == warehouseId)));
+                lot.Quantity > 0 && (allowed == null || allowed.Contains(lot.Inventory!.WarehouseId))
+                && (warehouseId == null || lot.Inventory!.WarehouseId == warehouseId)));
         }
 
         var sorted = query.SortBy is null
@@ -98,7 +106,8 @@ public sealed class BatchRepository(WmsDbContext dbContext) : IBatchRepository
                 batch.ManufactureDate,
                 batch.ExpiryDate,
                 Quantity = batch.Lots
-                    .Where(lot => warehouseId == null || lot.Inventory!.WarehouseId == warehouseId)
+                    .Where(lot => (allowed == null || allowed.Contains(lot.Inventory!.WarehouseId))
+                        && (warehouseId == null || lot.Inventory!.WarehouseId == warehouseId))
                     .Sum(lot => (decimal?)lot.Quantity) ?? 0m,
                 batch.Note,
                 batch.CreatedAt
@@ -115,9 +124,10 @@ public sealed class BatchRepository(WmsDbContext dbContext) : IBatchRepository
 
     public async Task<BatchDetail?> GetDetailAsync(int id, DateOnly today, int nearExpiryDays, CancellationToken cancellationToken)
     {
+        var allowed = access?.WarehouseIds;
         var batch = await dbContext.Set<Batch>()
             .AsNoTracking()
-            .Where(b => b.Id == id)
+            .Where(b => b.Id == id && (allowed == null || b.Lots.Any(lot => allowed.Contains(lot.Inventory!.WarehouseId))))
             .Select(b => new
             {
                 b.Id,
@@ -130,7 +140,7 @@ public sealed class BatchRepository(WmsDbContext dbContext) : IBatchRepository
                 b.Note,
                 b.CreatedAt,
                 Lots = b.Lots
-                    .Where(lot => lot.Quantity > 0)
+                    .Where(lot => lot.Quantity > 0 && (allowed == null || allowed.Contains(lot.Inventory!.WarehouseId)))
                     .OrderBy(lot => lot.Inventory!.Warehouse!.Code).ThenBy(lot => lot.Inventory!.Location!.Code)
                     .Select(lot => new BatchLotResponse(
                         lot.Inventory!.WarehouseId,
@@ -160,6 +170,11 @@ public sealed class BatchRepository(WmsDbContext dbContext) : IBatchRepository
         var lots = dbContext.Set<InventoryLot>()
             .AsNoTracking()
             .Where(lot => lot.Quantity > 0 && lot.Batch!.ExpiryDate != null && lot.Batch.ExpiryDate <= nearLimit);
+
+        if (access?.WarehouseIds is { } ids)
+        {
+            lots = lots.Where(lot => ids.Contains(lot.Inventory!.WarehouseId));
+        }
 
         lots = query.Status switch
         {

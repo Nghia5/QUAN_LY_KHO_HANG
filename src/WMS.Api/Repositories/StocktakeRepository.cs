@@ -1,3 +1,4 @@
+using WMS.Api.Authorization;
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using WMS.Api.Common;
@@ -29,7 +30,7 @@ public interface IStocktakeRepository
     Task<int> CountOpenByLocationAsync(int locationId, CancellationToken cancellationToken);
 }
 
-public sealed class StocktakeRepository(WmsDbContext dbContext) : IStocktakeRepository
+public sealed class StocktakeRepository(WmsDbContext dbContext, WarehouseAccess? access = null) : IStocktakeRepository
 {
     private static readonly IReadOnlyDictionary<string, Expression<Func<Stocktake, object?>>> SortMap =
         QueryableExtensions.SortMap<Stocktake>(
@@ -41,7 +42,7 @@ public sealed class StocktakeRepository(WmsDbContext dbContext) : IStocktakeRepo
 
     public Task<PagedResult<StocktakeSummary>> SearchAsync(StocktakeQuery query, CancellationToken cancellationToken)
     {
-        var stocktakes = Stocktakes;
+        var stocktakes = access?.Filter(Stocktakes, d => d.WarehouseId) ?? Stocktakes;
 
         if (query.WarehouseId is { } warehouseId)
         {

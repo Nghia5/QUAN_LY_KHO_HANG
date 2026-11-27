@@ -1,3 +1,4 @@
+using WMS.Api.Authorization;
 using WMS.Api.Dtos.Common;
 using WMS.Api.Dtos.Documents;
 using WMS.Api.Models.Documents;
@@ -6,7 +7,7 @@ using WMS.Api.Services.Documents;
 namespace WMS.Api.Dtos.Stocktakes;
 
 /// <summary>Creates a Draft stocktake. Empty scope = the whole warehouse.</summary>
-public sealed record CreateStocktakeRequest
+public sealed record CreateStocktakeRequest : IWarehouseRequest
 {
     public int WarehouseId { get; init; }
 

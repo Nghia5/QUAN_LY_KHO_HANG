@@ -1,3 +1,4 @@
+using WMS.Api.Authorization;
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using WMS.Api.Common;
@@ -30,7 +31,7 @@ public interface IStockTransferRepository
     Task<int> CountOpenByLocationAsync(int locationId, CancellationToken cancellationToken);
 }
 
-public sealed class StockTransferRepository(WmsDbContext dbContext) : IStockTransferRepository
+public sealed class StockTransferRepository(WmsDbContext dbContext, WarehouseAccess? access = null) : IStockTransferRepository
 {
     private static readonly IReadOnlyDictionary<string, Expression<Func<StockTransfer, object?>>> SortMap =
         QueryableExtensions.SortMap<StockTransfer>(
@@ -44,6 +45,10 @@ public sealed class StockTransferRepository(WmsDbContext dbContext) : IStockTran
     public Task<PagedResult<StockTransferSummary>> SearchAsync(StockTransferQuery query, CancellationToken cancellationToken)
     {
         var transfers = Transfers;
+        if (access?.WarehouseIds is { } ids)
+        {
+            transfers = transfers.Where(t => ids.Contains(t.WarehouseId) || ids.Contains(t.DestinationWarehouseId));
+        }
 
         if (query.WarehouseId is { } warehouseId)
         {

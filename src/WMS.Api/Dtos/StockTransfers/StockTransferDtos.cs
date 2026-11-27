@@ -1,3 +1,4 @@
+using WMS.Api.Authorization;
 using WMS.Api.Dtos.Common;
 using WMS.Api.Dtos.Documents;
 using WMS.Api.Models.Documents;
@@ -33,7 +34,7 @@ public interface IStockTransferPayload
 /// Creates a Draft transfer. Use the same warehouse for source and destination to move goods
 /// between bins. Warehouses cannot be changed afterwards.
 /// </summary>
-public sealed record CreateStockTransferRequest : IStockTransferPayload
+public sealed record CreateStockTransferRequest : IStockTransferPayload, IWarehouseRequest
 {
     /// <summary>Source warehouse.</summary>
     public int WarehouseId { get; init; }

@@ -1,3 +1,4 @@
+using WMS.Api.Authorization;
 using WMS.Api.Dtos.Common;
 using WMS.Api.Dtos.Documents;
 using WMS.Api.Models.Documents;
@@ -37,7 +38,7 @@ public interface IGoodsIssuePayload
 }
 
 /// <summary>Creates a Draft issue. The warehouse cannot be changed afterwards.</summary>
-public sealed record CreateGoodsIssueRequest : IGoodsIssuePayload
+public sealed record CreateGoodsIssueRequest : IGoodsIssuePayload, IWarehouseRequest
 {
     public int WarehouseId { get; init; }
 

@@ -378,6 +378,34 @@ public sealed class GoodsReceiptServiceTests(GoodsReceiptFixture fixture) : ICla
     }
 
     [Fact]
+    public async Task Draft_can_only_be_deleted_after_its_attachments_are_removed()
+    {
+        var product = await NewProductAsync();
+        await using var clerk = As(Clerk);
+        var receipt = await clerk.Service.CreateAsync(Request(Line(product, 1)), default);
+        var file = new UploadedFile
+        {
+            OriginalFileName = "receipt.pdf",
+            StoredFileName = "receipt.pdf",
+            FilePath = "documents/receipt.pdf",
+            ContentType = "application/pdf",
+            FileSize = 1,
+            DocumentType = WarehouseDocumentType.Receipt,
+            DocumentId = receipt.Id
+        };
+        clerk.Context.UploadedFiles.Add(file);
+        await clerk.Context.SaveChangesAsync();
+
+        await Assert.ThrowsAsync<ConflictException>(() => clerk.Service.DeleteAsync(receipt.Id, default));
+        Assert.Equal(["CREATED"], await AuditActionsAsync(receipt.Id));
+
+        clerk.Context.UploadedFiles.Remove(file);
+        await clerk.Context.SaveChangesAsync();
+        await clerk.Service.DeleteAsync(receipt.Id, default);
+        await Assert.ThrowsAsync<NotFoundException>(() => clerk.Service.GetAsync(receipt.Id, default));
+    }
+
+    [Fact]
     public async Task Master_data_rules_are_reported_per_line()
     {
         var active = await NewProductAsync();

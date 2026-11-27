@@ -1,3 +1,4 @@
+using WMS.Api.Authorization;
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using WMS.Api.Common;
@@ -29,7 +30,7 @@ public interface IGoodsIssueRepository
     Task<int> CountOpenByLocationAsync(int locationId, CancellationToken cancellationToken);
 }
 
-public sealed class GoodsIssueRepository(WmsDbContext dbContext) : IGoodsIssueRepository
+public sealed class GoodsIssueRepository(WmsDbContext dbContext, WarehouseAccess? access = null) : IGoodsIssueRepository
 {
     private static readonly IReadOnlyDictionary<string, Expression<Func<GoodsIssue, object?>>> SortMap =
         QueryableExtensions.SortMap<GoodsIssue>(
@@ -43,7 +44,7 @@ public sealed class GoodsIssueRepository(WmsDbContext dbContext) : IGoodsIssueRe
 
     public Task<PagedResult<GoodsIssueSummary>> SearchAsync(GoodsIssueQuery query, CancellationToken cancellationToken)
     {
-        var issues = Issues;
+        var issues = access?.Filter(Issues, d => d.WarehouseId) ?? Issues;
 
         if (query.WarehouseId is { } warehouseId)
         {

@@ -234,7 +234,7 @@ Policy dạng permission claim (`permission`), tên do module Kho đề xuất, 
 | Adjustment | `STOCK_ADJUSTMENT_VIEW`, `STOCK_ADJUSTMENT_CREATE`, `STOCK_ADJUSTMENT_APPROVE` |
 | Batch | `BATCH_VIEW`, `BATCH_MANAGE` |
 
-`*_CREATE` bao gồm tạo/sửa/submit/cancel chứng từ của mình ở Draft; `*_APPROVE` bao gồm approve/reject/complete.
+`*_CREATE` cho ph?p l?p, s?a v? g?i ch?ng t? trong ph?m vi kho ???c giao. Quy?n duy?t v? t? ch?i d?ng `*_APPROVE`. C?c quy?n ghi nh?n t?n, so?n, giao, nh?n v? ki?m ??m ???c li?t k? trong [Ph?n quy?n v?n h?nh kho](ACCESS_CONTROL.md).
 
 ## 7. Sự kiện tích hợp (chuẩn bị cho W-17/W-18)
 

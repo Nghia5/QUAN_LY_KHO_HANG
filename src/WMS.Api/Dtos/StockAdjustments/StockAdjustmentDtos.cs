@@ -1,3 +1,4 @@
+using WMS.Api.Authorization;
 using WMS.Api.Dtos.Common;
 using WMS.Api.Dtos.Documents;
 using WMS.Api.Models.Documents;
@@ -28,7 +29,7 @@ public interface IStockAdjustmentPayload
     IReadOnlyList<StockAdjustmentLineRequest> Lines { get; }
 }
 
-public sealed record CreateStockAdjustmentRequest : IStockAdjustmentPayload
+public sealed record CreateStockAdjustmentRequest : IStockAdjustmentPayload, IWarehouseRequest
 {
     public int WarehouseId { get; init; }
 

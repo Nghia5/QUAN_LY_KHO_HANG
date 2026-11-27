@@ -1,3 +1,4 @@
+using WMS.Api.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WMS.Api.Constants;
@@ -13,9 +14,9 @@ namespace WMS.Api.Controllers;
 /// warehouse documents (receipt, issue, transfer, stocktake, adjustment).
 /// </summary>
 [ApiController]
+[Authorize]
 [Route("api/inventories")]
 [Produces("application/json")]
-[Authorize(Policy = Permissions.InventoryView)]
 public sealed class InventoriesController(IInventoryRepository inventoryRepository) : ControllerBase
 {
     /// <summary>
@@ -23,6 +24,7 @@ public sealed class InventoriesController(IInventoryRepository inventoryReposito
     /// (InStock, LowStock, OutOfStock), keyword, whitelisted sorting and server-side paging.
     /// </summary>
     [HttpGet]
+    [WarehousePermission(Permissions.InventoryView)]
     [ProducesResponseType<PagedResult<InventoryResponse>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<PagedResult<InventoryResponse>>> Search(
@@ -31,6 +33,7 @@ public sealed class InventoriesController(IInventoryRepository inventoryReposito
         Ok(await inventoryRepository.SearchAsync(query, cancellationToken));
 
     [HttpGet("{id:int}")]
+    [WarehousePermission(Permissions.InventoryView, WarehouseResource.Inventory)]
     [ProducesResponseType<InventoryResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<InventoryResponse>> GetById(int id, CancellationToken cancellationToken) =>

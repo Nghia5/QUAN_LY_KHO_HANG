@@ -14,6 +14,9 @@ public sealed class NotFoundException(string resource, object key)
 public sealed class ConflictException(string message)
     : AppException("Conflict", message, StatusCodes.Status409Conflict);
 
+public sealed class UnauthorizedException(string message = "Invalid credentials or token.")
+    : AppException("Unauthorized", message, StatusCodes.Status401Unauthorized);
+
 /// <summary>Authenticated but not allowed to perform this specific action.</summary>
 public sealed class ForbiddenException(string message)
     : AppException("Forbidden", message, StatusCodes.Status403Forbidden);

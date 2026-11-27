@@ -1,3 +1,4 @@
+using WMS.Api.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WMS.Api.Constants;
@@ -8,13 +9,14 @@ using WMS.Api.Services.Warehouses;
 namespace WMS.Api.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/warehouses")]
 [Produces("application/json")]
 public sealed class WarehousesController(IWarehouseService warehouseService) : ControllerBase
 {
     /// <summary>Searches warehouses with paging, keyword, filters and sorting.</summary>
     [HttpGet]
-    [Authorize(Policy = Permissions.WarehouseView)]
+    [WarehousePermission(Permissions.WarehouseView)]
     [ProducesResponseType<PagedResult<WarehouseResponse>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<PagedResult<WarehouseResponse>>> Search(
@@ -24,7 +26,7 @@ public sealed class WarehousesController(IWarehouseService warehouseService) : C
 
     /// <summary>Gets a warehouse by ID.</summary>
     [HttpGet("{id:int}")]
-    [Authorize(Policy = Permissions.WarehouseView)]
+    [WarehousePermission(Permissions.WarehouseView, WarehouseResource.Warehouse)]
     [ProducesResponseType<WarehouseResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<WarehouseResponse>> GetById(int id, CancellationToken cancellationToken) =>
@@ -32,7 +34,7 @@ public sealed class WarehousesController(IWarehouseService warehouseService) : C
 
     /// <summary>Creates a warehouse. Code is normalized to upper-case and must be unique.</summary>
     [HttpPost]
-    [Authorize(Policy = Permissions.WarehouseCreate)]
+    [Authorize(Policy = ActiveAdminRequirement.PolicyName)]
     [ProducesResponseType<WarehouseResponse>(StatusCodes.Status201Created)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
@@ -46,7 +48,7 @@ public sealed class WarehousesController(IWarehouseService warehouseService) : C
 
     /// <summary>Updates a warehouse (Code is immutable).</summary>
     [HttpPut("{id:int}")]
-    [Authorize(Policy = Permissions.WarehouseUpdate)]
+    [WarehousePermission(Permissions.WarehouseUpdate, WarehouseResource.Warehouse)]
     [ProducesResponseType<WarehouseResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
@@ -58,7 +60,7 @@ public sealed class WarehousesController(IWarehouseService warehouseService) : C
 
     /// <summary>Re-activates a warehouse.</summary>
     [HttpPatch("{id:int}/activate")]
-    [Authorize(Policy = Permissions.WarehouseUpdate)]
+    [WarehousePermission(Permissions.WarehouseUpdate, WarehouseResource.Warehouse)]
     [ProducesResponseType<WarehouseResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<WarehouseResponse>> Activate(int id, CancellationToken cancellationToken) =>
@@ -66,7 +68,7 @@ public sealed class WarehousesController(IWarehouseService warehouseService) : C
 
     /// <summary>Deactivates a warehouse. Fails while it holds stock or has open documents.</summary>
     [HttpPatch("{id:int}/deactivate")]
-    [Authorize(Policy = Permissions.WarehouseUpdate)]
+    [WarehousePermission(Permissions.WarehouseUpdate, WarehouseResource.Warehouse)]
     [ProducesResponseType<WarehouseResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
@@ -75,7 +77,7 @@ public sealed class WarehousesController(IWarehouseService warehouseService) : C
 
     /// <summary>Hard-deletes a warehouse that has no locations, stock or transactions.</summary>
     [HttpDelete("{id:int}")]
-    [Authorize(Policy = Permissions.WarehouseDelete)]
+    [WarehousePermission(Permissions.WarehouseDelete, WarehouseResource.Warehouse)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]

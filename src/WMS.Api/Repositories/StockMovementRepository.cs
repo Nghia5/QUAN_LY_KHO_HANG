@@ -1,3 +1,4 @@
+using WMS.Api.Authorization;
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using WMS.Api.Common;
@@ -22,7 +23,7 @@ public interface IStockMovementRepository
     Task<int> CountByLocationAsync(int locationId, CancellationToken cancellationToken);
 }
 
-public sealed class StockMovementRepository(WmsDbContext dbContext) : IStockMovementRepository
+public sealed class StockMovementRepository(WmsDbContext dbContext, WarehouseAccess? access = null) : IStockMovementRepository
 {
     private static readonly IReadOnlyDictionary<string, Expression<Func<StockMovement, object?>>> SortMap =
         QueryableExtensions.SortMap<StockMovement>(
@@ -58,7 +59,7 @@ public sealed class StockMovementRepository(WmsDbContext dbContext) : IStockMove
 
     public Task<PagedResult<StockMovementResponse>> SearchAsync(StockMovementQuery query, CancellationToken cancellationToken)
     {
-        var movements = Movements;
+        var movements = access?.Filter(Movements, m => m.WarehouseId) ?? Movements;
 
         if (query.WarehouseId is { } warehouseId)
         {
@@ -133,7 +134,7 @@ public sealed class StockMovementRepository(WmsDbContext dbContext) : IStockMove
         var from = ToUtc(query.From);
         var to = ToUtc(query.To);
 
-        var movements = Movements.Where(movement => movement.CreatedAt < to);
+        var movements = (access?.Filter(Movements, m => m.WarehouseId) ?? Movements).Where(movement => movement.CreatedAt < to);
         if (query.WarehouseId is { } warehouseId)
         {
             movements = movements.Where(movement => movement.WarehouseId == warehouseId);

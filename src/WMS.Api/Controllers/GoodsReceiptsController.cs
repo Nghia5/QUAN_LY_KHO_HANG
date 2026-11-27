@@ -1,3 +1,4 @@
+using WMS.Api.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WMS.Api.Constants;
@@ -14,12 +15,13 @@ namespace WMS.Api.Controllers;
 /// 422 business rule (invalid status transition, inactive product/location, self-approval...).
 /// </summary>
 [ApiController]
+[Authorize]
 [Route("api/goods-receipts")]
 [Produces("application/json")]
 public sealed class GoodsReceiptsController(IGoodsReceiptService service) : ControllerBase
 {
     [HttpGet]
-    [Authorize(Policy = Permissions.GoodsReceiptView)]
+    [WarehousePermission(Permissions.GoodsReceiptView)]
     [ProducesResponseType<PagedResult<GoodsReceiptSummary>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<PagedResult<GoodsReceiptSummary>>> Search(
         [FromQuery] GoodsReceiptQuery query,
@@ -27,7 +29,7 @@ public sealed class GoodsReceiptsController(IGoodsReceiptService service) : Cont
         Ok(await service.SearchAsync(query, cancellationToken));
 
     [HttpGet("{id:int}")]
-    [Authorize(Policy = Permissions.GoodsReceiptView)]
+    [WarehousePermission(Permissions.GoodsReceiptView, WarehouseResource.Receipt)]
     [ProducesResponseType<GoodsReceiptDetail>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<GoodsReceiptDetail>> Get(int id, CancellationToken cancellationToken) =>
@@ -35,7 +37,7 @@ public sealed class GoodsReceiptsController(IGoodsReceiptService service) : Cont
 
     /// <summary>Creates a Draft receipt (no stock change yet).</summary>
     [HttpPost]
-    [Authorize(Policy = Permissions.GoodsReceiptCreate)]
+    [WarehousePermission(Permissions.GoodsReceiptCreate)]
     [ProducesResponseType<GoodsReceiptDetail>(StatusCodes.Status201Created)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
@@ -49,7 +51,7 @@ public sealed class GoodsReceiptsController(IGoodsReceiptService service) : Cont
 
     /// <summary>Replaces header and lines of a Draft receipt.</summary>
     [HttpPut("{id:int}")]
-    [Authorize(Policy = Permissions.GoodsReceiptCreate)]
+    [WarehousePermission(Permissions.GoodsReceiptCreate, WarehouseResource.Receipt)]
     [ProducesResponseType<GoodsReceiptDetail>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
     public async Task<ActionResult<GoodsReceiptDetail>> Update(
@@ -60,7 +62,7 @@ public sealed class GoodsReceiptsController(IGoodsReceiptService service) : Cont
 
     /// <summary>Deletes a Draft receipt.</summary>
     [HttpDelete("{id:int}")]
-    [Authorize(Policy = Permissions.GoodsReceiptCreate)]
+    [WarehousePermission(Permissions.GoodsReceiptCreate, WarehouseResource.Receipt)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
@@ -71,21 +73,21 @@ public sealed class GoodsReceiptsController(IGoodsReceiptService service) : Cont
 
     /// <summary>Draft → PendingApproval.</summary>
     [HttpPost("{id:int}/submit")]
-    [Authorize(Policy = Permissions.GoodsReceiptCreate)]
+    [WarehousePermission(Permissions.GoodsReceiptCreate, WarehouseResource.Receipt)]
     [ProducesResponseType<GoodsReceiptDetail>(StatusCodes.Status200OK)]
     public async Task<ActionResult<GoodsReceiptDetail>> Submit(int id, CancellationToken cancellationToken) =>
         Ok(await service.SubmitAsync(id, cancellationToken));
 
     /// <summary>PendingApproval → Approved (approver must differ from the creator).</summary>
     [HttpPost("{id:int}/approve")]
-    [Authorize(Policy = Permissions.GoodsReceiptApprove)]
+    [WarehousePermission(Permissions.GoodsReceiptApprove, WarehouseResource.Receipt)]
     [ProducesResponseType<GoodsReceiptDetail>(StatusCodes.Status200OK)]
     public async Task<ActionResult<GoodsReceiptDetail>> Approve(int id, CancellationToken cancellationToken) =>
         Ok(await service.ApproveAsync(id, cancellationToken));
 
     /// <summary>PendingApproval → Rejected (reason required).</summary>
     [HttpPost("{id:int}/reject")]
-    [Authorize(Policy = Permissions.GoodsReceiptApprove)]
+    [WarehousePermission(Permissions.GoodsReceiptApprove, WarehouseResource.Receipt)]
     [ProducesResponseType<GoodsReceiptDetail>(StatusCodes.Status200OK)]
     public async Task<ActionResult<GoodsReceiptDetail>> Reject(
         int id,
@@ -95,14 +97,14 @@ public sealed class GoodsReceiptsController(IGoodsReceiptService service) : Cont
 
     /// <summary>Rejected → Draft, to fix and submit again.</summary>
     [HttpPost("{id:int}/reopen")]
-    [Authorize(Policy = Permissions.GoodsReceiptCreate)]
+    [WarehousePermission(Permissions.GoodsReceiptCreate, WarehouseResource.Receipt)]
     [ProducesResponseType<GoodsReceiptDetail>(StatusCodes.Status200OK)]
     public async Task<ActionResult<GoodsReceiptDetail>> Reopen(int id, CancellationToken cancellationToken) =>
         Ok(await service.ReopenAsync(id, cancellationToken));
 
     /// <summary>Approved → Completed: increases stock, writes stock movements and audit in one transaction.</summary>
     [HttpPost("{id:int}/complete")]
-    [Authorize(Policy = Permissions.GoodsReceiptApprove)]
+    [WarehousePermission(Permissions.GoodsReceiptComplete, WarehouseResource.Receipt)]
     [ProducesResponseType<GoodsReceiptDetail>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
@@ -111,7 +113,7 @@ public sealed class GoodsReceiptsController(IGoodsReceiptService service) : Cont
 
     /// <summary>Cancels a receipt that is not completed (reason required; approved ones need GOODS_RECEIPT_APPROVE).</summary>
     [HttpPost("{id:int}/cancel")]
-    [Authorize(Policy = Permissions.GoodsReceiptCreate)]
+    [WarehousePermission(Permissions.GoodsReceiptCreate, WarehouseResource.Receipt)]
     [ProducesResponseType<GoodsReceiptDetail>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<GoodsReceiptDetail>> Cancel(

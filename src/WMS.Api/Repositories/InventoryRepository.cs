@@ -1,3 +1,4 @@
+using WMS.Api.Authorization;
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using WMS.Api.Common;
@@ -8,7 +9,7 @@ using WMS.Api.Models;
 
 namespace WMS.Api.Repositories;
 
-public sealed class InventoryRepository(WmsDbContext dbContext) : IInventoryRepository
+public sealed class InventoryRepository(WmsDbContext dbContext, WarehouseAccess? access = null) : IInventoryRepository
 {
     // Whitelist: only these keys can reach ORDER BY.
     private static readonly IReadOnlyDictionary<string, Expression<Func<Inventory, object?>>> SortMap =
@@ -51,7 +52,7 @@ public sealed class InventoryRepository(WmsDbContext dbContext) : IInventoryRepo
             inventory.UpdatedAt);
 
     public Task<PagedResult<InventoryResponse>> SearchAsync(InventoryQuery query, CancellationToken cancellationToken) =>
-        ApplyFilters(dbContext.Set<Inventory>().AsNoTracking(), query)
+        ApplyFilters(access?.Filter(dbContext.Set<Inventory>().AsNoTracking(), i => i.WarehouseId) ?? dbContext.Set<Inventory>().AsNoTracking(), query)
             .ApplySort(query, SortMap, "productSku", inventory => inventory.Id)
             .Select(ToResponse)
             .ToPagedResultAsync(query, cancellationToken);

@@ -1,3 +1,4 @@
+using WMS.Api.Authorization;
 using WMS.Api.Dtos.Common;
 
 namespace WMS.Api.Dtos.Batches;
@@ -119,7 +120,7 @@ public sealed record ExpiryAlertRow(
     int DaysToExpiry,
     ExpiryStatus Status);
 
-public sealed record PickSuggestionQuery
+public sealed record PickSuggestionQuery : IWarehouseRequest
 {
     public int ProductId { get; init; }
 
