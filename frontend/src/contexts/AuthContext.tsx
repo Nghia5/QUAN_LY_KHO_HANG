@@ -6,7 +6,7 @@ interface AuthState {
   user: (AuthUserSummary & { permissions?: string[] }) | null;
   isAuthenticated: boolean;
   loading: boolean;
-  login: (accessToken: string, refreshToken: string, user: AuthUserSummary) => void;
+  login: (accessToken: string, refreshToken: string, user: AuthUserSummary) => Promise<void>;
   logout: () => void;
   hasPermission: (perm: string) => boolean;
 }
@@ -32,10 +32,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const login = (accessToken: string, refreshToken: string, u: AuthUserSummary) => {
+  const login = async (accessToken: string, refreshToken: string, u: AuthUserSummary) => {
+    localStorage.clear(); // drop any state left by the previous account
     localStorage.setItem('accessToken', accessToken);
     localStorage.setItem('refreshToken', refreshToken);
-    setUser(u);
+    try {
+      // The login response has no permissions; load the full profile of the new account.
+      const { data } = await authApi.me();
+      setUser(data as unknown as AuthUserSummary & { permissions?: string[] });
+    } catch {
+      setUser(u);
+    }
   };
 
   const logout = () => {

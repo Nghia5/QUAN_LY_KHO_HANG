@@ -4,7 +4,8 @@ import {
   Divider, Modal, Form, InputNumber, Card, Tag, App
 } from 'antd';
 import {
-  PlusOutlined, ReloadOutlined, EyeOutlined, DeleteOutlined
+  PlusOutlined, ReloadOutlined, EyeOutlined, DeleteOutlined,
+  PrinterOutlined, DownloadOutlined
 } from '@ant-design/icons';
 import type {
   GoodsIssueSummary, GoodsIssueDetail, WarehouseResponse,
@@ -14,6 +15,8 @@ import {
   goodsIssuesApi, warehousesApi, productsApi, locationsApi, extractItems
 } from '../../api/services';
 import { StatusTag, DocumentActions } from '../../components/DocumentActions';
+import { DocumentAttachments } from '../../components/DocumentAttachments';
+import { exportToCsv, printDocument } from '../../utils/exportReceipt';
 
 export default function GoodsIssuesPage() {
   const { message, modal } = App.useApp();
@@ -135,6 +138,39 @@ export default function GoodsIssuesPage() {
     } else {
       message.warning(`Chưa hỗ trợ thao tác: ${action}`);
     }
+  };
+
+  const handlePrint = () => {
+    if (!detail) return;
+    printDocument({
+      documentNo: detail.documentNo,
+      type: 'ISSUE',
+      date: detail.issueDate || new Date().toISOString(),
+      warehouseName: detail.warehouseCode || 'Kho xuất',
+      partnerName: detail.customerName,
+      referenceNo: detail.referenceNo,
+      note: detail.note,
+      lines: (detail.lines || []).map(l => ({
+        sku: l.productSku,
+        name: l.productName,
+        location: l.locationCode,
+        quantity: l.quantity,
+        batchCode: l.batchCode,
+      })),
+    });
+  };
+
+  const handleExportCsv = () => {
+    if (!detail) return;
+    const headers = ['Mã SP', 'Tên sản phẩm', 'Vị trí lấy', 'Số lượng xuất', 'Lô hàng'];
+    const rows = (detail.lines || []).map(l => [
+      l.productSku,
+      l.productName,
+      l.locationCode,
+      l.quantity,
+      l.batchCode || '',
+    ]);
+    exportToCsv(`PhieuXuatKho_${detail.documentNo}`, headers, rows);
   };
 
   const handleCreateIssue = async (values: any) => {
@@ -368,9 +404,15 @@ export default function GoodsIssuesPage() {
       {/* Drawer Chi tiết Phiếu Xuất Kho */}
       <Drawer
         title={`Chi tiết phiếu: ${detail?.documentNo || ''}`}
-        width={700}
+        width={720}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
+        extra={
+          <Space>
+            <Button icon={<PrinterOutlined />} onClick={handlePrint}>In phiếu</Button>
+            <Button icon={<DownloadOutlined />} onClick={handleExportCsv}>Xuất CSV</Button>
+          </Space>
+        }
       >
         {detail && (
           <>
@@ -402,6 +444,13 @@ export default function GoodsIssuesPage() {
             <DocumentActions
               availableActions={detail.availableActions}
               onAction={handleAction}
+            />
+
+            <Divider orientation="left">Tệp đính kèm (Phiếu xuất ký nhận, chứng từ)</Divider>
+            <DocumentAttachments
+              documentType="Issue"
+              documentId={detail.id}
+              readonly={detail.status === 'Completed' || detail.status === 'Cancelled'}
             />
           </>
         )}

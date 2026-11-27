@@ -6,7 +6,7 @@ import {
 } from 'antd';
 import {
   PlusOutlined, ReloadOutlined, EyeOutlined, CheckSquareOutlined,
-  EditOutlined
+  EditOutlined, DownloadOutlined
 } from '@ant-design/icons';
 import type {
   StocktakeSummary, StocktakeDetail, WarehouseResponse,
@@ -16,6 +16,8 @@ import {
   stocktakesApi, warehousesApi, productsApi, locationsApi, extractItems
 } from '../../api/services';
 import { StatusTag, DocumentActions } from '../../components/DocumentActions';
+import { DocumentAttachments } from '../../components/DocumentAttachments';
+import { exportToCsv } from '../../utils/exportReceipt';
 
 export default function StocktakesPage() {
   const { message, modal } = App.useApp();
@@ -339,6 +341,26 @@ export default function StocktakesPage() {
         width={780}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
+        extra={
+          <Button
+            icon={<DownloadOutlined />}
+            onClick={() => {
+              if (!detail) return;
+              const headers = ['Mã SP', 'Tên sản phẩm', 'Vị trí', 'Tồn sổ sách', 'Thực tế đếm', 'Chênh lệch'];
+              const rows = (detail.lines || []).map(l => [
+                l.productSku,
+                l.productName,
+                l.locationCode,
+                l.systemQuantity,
+                l.countedQuantity !== undefined && l.countedQuantity !== null ? l.countedQuantity : 'Chưa đếm',
+                l.difference ?? '-',
+              ]);
+              exportToCsv(`KiemKe_${detail.documentNo}`, headers, rows);
+            }}
+          >
+            Xuất CSV
+          </Button>
+        }
       >
         {detail && (
           <>
@@ -438,6 +460,13 @@ export default function StocktakesPage() {
             <DocumentActions
               availableActions={detail.availableActions}
               onAction={handleAction}
+            />
+
+            <Divider orientation="left">Tệp đính kèm (Biên bản kiểm kê, phiếu ghi chép)</Divider>
+            <DocumentAttachments
+              documentType="Stocktake"
+              documentId={detail.id}
+              readonly={detail.status === 'Completed' || detail.status === 'Cancelled'}
             />
           </>
         )}

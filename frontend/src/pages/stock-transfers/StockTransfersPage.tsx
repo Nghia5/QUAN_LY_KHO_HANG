@@ -4,7 +4,8 @@ import {
   Divider, Steps, Modal, Form, InputNumber, Card, Tag
 } from 'antd';
 import {
-  PlusOutlined, ReloadOutlined, EyeOutlined, DeleteOutlined
+  PlusOutlined, ReloadOutlined, EyeOutlined, DeleteOutlined,
+  PrinterOutlined, DownloadOutlined
 } from '@ant-design/icons';
 import type {
   StockTransferSummary, StockTransferDetail, WarehouseResponse,
@@ -14,6 +15,8 @@ import {
   stockTransfersApi, warehousesApi, productsApi, locationsApi, extractItems
 } from '../../api/services';
 import { StatusTag, DocumentActions } from '../../components/DocumentActions';
+import { DocumentAttachments } from '../../components/DocumentAttachments';
+import { exportToCsv, printDocument } from '../../utils/exportReceipt';
 
 export default function StockTransfersPage() {
   const { message, modal } = App.useApp();
@@ -144,6 +147,38 @@ export default function StockTransfersPage() {
     } else {
       message.warning(`Chưa hỗ trợ thao tác: ${action}`);
     }
+  };
+
+  const handlePrint = () => {
+    if (!detail) return;
+    printDocument({
+      documentNo: detail.documentNo,
+      type: 'TRANSFER',
+      date: (detail as any).createdAt || new Date().toISOString(),
+      warehouseName: `${detail.sourceWarehouseCode} -> ${detail.destinationWarehouseCode}`,
+      partnerTitle: 'Kho tiếp nhận:',
+      partnerName: detail.destinationWarehouseCode,
+      note: detail.reason ? `${detail.reason}${detail.note ? ' - ' + detail.note : ''}` : detail.note,
+      lines: (detail.lines || []).map(l => ({
+        sku: l.productSku,
+        name: l.productName,
+        location: `${l.fromLocationCode} ➔ ${l.toLocationCode}`,
+        quantity: l.quantity,
+      })),
+    });
+  };
+
+  const handleExportCsv = () => {
+    if (!detail) return;
+    const headers = ['Mã SP', 'Tên sản phẩm', 'Vị trí đi', 'Vị trí đến', 'Số lượng'];
+    const rows = (detail.lines || []).map(l => [
+      l.productSku,
+      l.productName,
+      l.fromLocationCode,
+      l.toLocationCode,
+      l.quantity,
+    ]);
+    exportToCsv(`PhieuChuyenKho_${detail.documentNo}`, headers, rows);
   };
 
   const handleCreateTransfer = async (values: any) => {
@@ -379,6 +414,12 @@ export default function StockTransfersPage() {
         width={750}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
+        extra={
+          <Space>
+            <Button icon={<PrinterOutlined />} onClick={handlePrint}>In phiếu</Button>
+            <Button icon={<DownloadOutlined />} onClick={handleExportCsv}>Xuất CSV</Button>
+          </Space>
+        }
       >
         {detail && (
           <>
@@ -422,6 +463,13 @@ export default function StockTransfersPage() {
             <DocumentActions
               availableActions={detail.availableActions}
               onAction={handleAction}
+            />
+
+            <Divider orientation="left">Tệp đính kèm (Biên bản vận chuyển, phiếu điều chuyển)</Divider>
+            <DocumentAttachments
+              documentType="Transfer"
+              documentId={detail.id}
+              readonly={detail.status === 'Completed' || detail.status === 'Cancelled'}
             />
           </>
         )}

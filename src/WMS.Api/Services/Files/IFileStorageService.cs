@@ -12,6 +12,8 @@ public interface IFileStorageService
     Task<IReadOnlyList<DocumentAttachmentResponse>> ListDocumentAttachmentsAsync(
         WarehouseDocumentType type, int id, CancellationToken cancellationToken);
 
+    Task<IReadOnlyList<DocumentAttachmentResponse>> ListAllAsync(CancellationToken cancellationToken);
+
     Task<FileDownloadInfo> GetFileDownloadAsync(Guid fileId, int userId, CancellationToken cancellationToken);
 
     Task DeleteFileAsync(Guid fileId, int userId, CancellationToken cancellationToken);

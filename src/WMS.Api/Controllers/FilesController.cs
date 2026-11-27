@@ -47,6 +47,10 @@ public sealed class FilesController(IFileStorageService fileStorageService, ICur
         WarehouseDocumentType documentType, int documentId, CancellationToken cancellationToken) =>
         Ok(await fileStorageService.ListDocumentAttachmentsAsync(documentType, documentId, cancellationToken));
 
+    [HttpGet]
+    public async Task<ActionResult<IReadOnlyList<DocumentAttachmentResponse>>> ListAll(CancellationToken cancellationToken) =>
+        Ok(await fileStorageService.ListAllAsync(cancellationToken));
+
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {

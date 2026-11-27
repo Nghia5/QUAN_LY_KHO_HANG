@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Hosting;
+using WMS.Api.Common;
 using WMS.Api.Repositories;
 using WMS.Api.Dtos.Files;
 using WMS.Api.Exceptions;
@@ -13,6 +14,7 @@ public sealed class FileStorageService(
     IConfiguration configuration,
     TimeProvider timeProvider,
     DocumentAttachmentAccess attachmentAccess,
+    ICurrentUser currentUser,
     ILogger<FileStorageService> logger) : IFileStorageService
 {
     private string BaseStorageDirectory =>
@@ -166,7 +168,21 @@ public sealed class FileStorageService(
         return files.Select(file => new DocumentAttachmentResponse(
             file.Id, file.OriginalFileName, file.FileSize, file.UploadedAt, $"/api/files/{file.Id}")
         {
-            Description = file.Description
+            Description = file.Description,
+            DocumentType = file.DocumentType,
+            DocumentId = file.DocumentId,
+        }).ToList();
+    }
+
+    public async Task<IReadOnlyList<DocumentAttachmentResponse>> ListAllAsync(CancellationToken cancellationToken)
+    {
+        var files = await uploadedFileRepository.ListAllAsync(cancellationToken);
+        return files.Select(file => new DocumentAttachmentResponse(
+            file.Id, file.OriginalFileName, file.FileSize, file.UploadedAt, $"/api/files/{file.Id}")
+        {
+            Description = file.Description,
+            DocumentType = file.DocumentType,
+            DocumentId = file.DocumentId,
         }).ToList();
     }
 
@@ -177,7 +193,7 @@ public sealed class FileStorageService(
             ?? throw new NotFoundException("File", fileId);
 
         var isAttachment = file.DocumentType is not null && file.DocumentId is not null;
-        if ((write || !isAttachment) && file.UploadedBy != userId)
+        if (!currentUser.IsAdmin && (write || !isAttachment) && file.UploadedBy != userId)
         {
             throw new NotFoundException("File", fileId);
         }

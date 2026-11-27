@@ -25,7 +25,9 @@ api.interceptors.response.use(
   (res) => res,
   async (error) => {
     const originalRequest = error.config;
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // A 401 from login/refresh means bad credentials, not an expired session: let the caller show it.
+    const isAuthEndpoint = /\/auth\/(login|refresh)$/.test(originalRequest?.url ?? '');
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       originalRequest._retry = true;
       const refreshToken = localStorage.getItem('refreshToken');
       if (refreshToken) {

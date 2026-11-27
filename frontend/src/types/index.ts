@@ -317,6 +317,18 @@ export interface DocumentAction {
 
 export type DocumentActionItem = DocumentAction | string;
 
+/* ── Files & Attachments ── */
+export interface FileAttachment {
+  id: string;
+  fileName: string;
+  size: number;
+  uploadedAt: string;
+  fileUrl: string;
+  description?: string;
+  documentType?: 'Receipt' | 'Issue' | 'Transfer' | 'Stocktake' | 'Adjustment';
+  documentId?: number;
+}
+
 /* ── Goods Receipts ── */
 export interface GoodsReceiptLineRequest {
   productId: number;

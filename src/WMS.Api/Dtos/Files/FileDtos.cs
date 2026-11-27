@@ -150,4 +150,6 @@ public sealed record FileDownloadInfo(
 public sealed record DocumentAttachmentResponse(Guid Id, string FileName, long Size, DateTime UploadedAt, string FileUrl)
 {
     public string? Description { get; init; }
+    public WarehouseDocumentType? DocumentType { get; init; }
+    public int? DocumentId { get; init; }
 }

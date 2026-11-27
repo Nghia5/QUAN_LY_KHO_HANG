@@ -6,7 +6,7 @@ import {
   TeamOutlined, SafetyOutlined, ImportOutlined, ExportOutlined,
   SyncOutlined, FileSearchOutlined, ToolOutlined, ExperimentOutlined,
   LogoutOutlined, SettingOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
-  ApartmentOutlined, ThunderboltOutlined,
+  ApartmentOutlined, ThunderboltOutlined, FileTextOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -58,6 +58,7 @@ const menuItems = [
     children: [
       { key: '/users', icon: <UserOutlined />, label: 'Người dùng' },
       { key: '/roles', icon: <SafetyOutlined />, label: 'Vai trò' },
+      { key: '/files', icon: <FileTextOutlined />, label: 'Quản lý tệp tin' },
     ],
   },
 ];

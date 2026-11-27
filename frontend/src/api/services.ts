@@ -18,6 +18,7 @@ import type {
   StockMovementResponse, StockReportRow,
   GoodsReceiptSummary, GoodsReceiptDetail, CreateGoodsReceiptRequest,
   GoodsIssueSummary, GoodsIssueDetail, CreateGoodsIssueRequest,
+  FileAttachment,
   StockTransferSummary, StockTransferDetail, CreateStockTransferRequest,
   StocktakeSummary, StocktakeDetail, CreateStocktakeRequest, StocktakeCountItem,
   StockAdjustmentSummary, StockAdjustmentDetail, CreateStockAdjustmentRequest,
@@ -205,4 +206,40 @@ export const batchesApi = {
   delete: (id: number) => api.delete(`/batches/${id}`),
   expiryAlerts: (params?: Record<string, unknown>) => api.get<PagedResult<ExpiryAlertRow>>('/batches/expiry-alerts', { params }),
   pickSuggestion: (params: Record<string, unknown>) => api.get('/batches/pick-suggestion', { params }),
+};
+
+/* ── Files & Attachments ── */
+export const filesApi = {
+  listAll: () => api.get<FileAttachment[]>('/files'),
+  listForDocument: (documentType: string, documentId: number) =>
+    api.get<FileAttachment[]>(`/files/document/${documentType}/${documentId}`),
+  uploadDocument: (file: File, documentType: string, documentId: number, description?: string) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('documentType', documentType);
+    formData.append('documentId', documentId.toString());
+    if (description) formData.append('description', description);
+    return api.post<{ id: string; originalFileName: string; fileUrl: string }>('/files/document', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  uploadAvatar: (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post<{ id: string; originalFileName: string; fileUrl: string }>('/files/avatar', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  delete: (id: string) => api.delete(`/files/${id}`),
+  downloadFile: async (id: string, filename: string) => {
+    const res = await api.get(`/files/${id}`, { responseType: 'blob' });
+    const url = window.URL.createObjectURL(new Blob([res.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    link.parentNode?.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  },
 };

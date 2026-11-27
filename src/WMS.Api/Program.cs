@@ -12,8 +12,9 @@ using WMS.Api.Repositories;
 using WMS.Api.Services;
 
 var initializeUserPlatform = args.Contains("--initialize-user-platform", StringComparer.Ordinal);
+var seedSampleData = args.Contains("--seed-sample-data", StringComparer.Ordinal);
 var builder = WebApplication.CreateBuilder(
-    args.Where(arg => arg != "--initialize-user-platform").ToArray());
+    args.Where(arg => arg is not ("--initialize-user-platform" or "--seed-sample-data")).ToArray());
 
 // Add services to the container.
 builder.Services.AddControllers();
@@ -83,6 +84,15 @@ var app = builder.Build();
 if (initializeUserPlatform)
 {
     await UserPlatformInitializer.InitializeAsync(app.Services, app.Configuration, CancellationToken.None);
+    if (!seedSampleData)
+    {
+        return;
+    }
+}
+
+if (seedSampleData)
+{
+    await SampleDataSeeder.SeedAsync(app.Services, CancellationToken.None);
     return;
 }
 

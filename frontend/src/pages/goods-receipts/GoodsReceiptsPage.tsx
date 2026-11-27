@@ -4,7 +4,8 @@ import {
   Divider, Modal, Form, InputNumber, Card, Tag, Alert, App
 } from 'antd';
 import {
-  PlusOutlined, ReloadOutlined, EyeOutlined, DeleteOutlined
+  PlusOutlined, ReloadOutlined, EyeOutlined, DeleteOutlined,
+  PrinterOutlined, DownloadOutlined
 } from '@ant-design/icons';
 import type {
   GoodsReceiptSummary, GoodsReceiptDetail, WarehouseResponse,
@@ -14,6 +15,8 @@ import {
   goodsReceiptsApi, warehousesApi, suppliersApi, productsApi, locationsApi, extractItems
 } from '../../api/services';
 import { StatusTag, DocumentActions } from '../../components/DocumentActions';
+import { DocumentAttachments } from '../../components/DocumentAttachments';
+import { exportToCsv, printDocument } from '../../utils/exportReceipt';
 
 export default function GoodsReceiptsPage() {
   const { message, modal } = App.useApp();
@@ -138,6 +141,41 @@ export default function GoodsReceiptsPage() {
     } else {
       message.warning(`Chưa hỗ trợ thao tác: ${action}`);
     }
+  };
+
+  const handlePrint = () => {
+    if (!detail) return;
+    printDocument({
+      documentNo: detail.documentNo,
+      type: 'RECEIPT',
+      date: detail.receiptDate || new Date().toISOString(),
+      warehouseName: detail.warehouseCode || 'Kho chính',
+      partnerName: detail.supplierName,
+      referenceNo: detail.referenceNo,
+      note: detail.note,
+      lines: (detail.lines || []).map(l => ({
+        sku: l.productSku,
+        name: l.productName,
+        location: l.locationCode,
+        quantity: l.quantity,
+        unitCost: l.unitCost,
+        batchCode: l.batchCode,
+      })),
+    });
+  };
+
+  const handleExportCsv = () => {
+    if (!detail) return;
+    const headers = ['Mã SP', 'Tên sản phẩm', 'Vị trí', 'Số lượng', 'Đơn giá', 'Lô hàng'];
+    const rows = (detail.lines || []).map(l => [
+      l.productSku,
+      l.productName,
+      l.locationCode,
+      l.quantity,
+      l.unitCost || 0,
+      l.batchCode || '',
+    ]);
+    exportToCsv(`PhieuNhapKho_${detail.documentNo}`, headers, rows);
   };
 
   const handleCreateReceipt = async (values: any) => {
@@ -412,9 +450,15 @@ export default function GoodsReceiptsPage() {
       {/* Drawer Chi tiết Phiếu Nhập Kho */}
       <Drawer
         title={`Chi tiết phiếu: ${detail?.documentNo || ''}`}
-        width={700}
+        width={720}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
+        extra={
+          <Space>
+            <Button icon={<PrinterOutlined />} onClick={handlePrint}>In phiếu</Button>
+            <Button icon={<DownloadOutlined />} onClick={handleExportCsv}>Xuất CSV</Button>
+          </Space>
+        }
       >
         {detail && (
           <>
@@ -447,6 +491,13 @@ export default function GoodsReceiptsPage() {
             <DocumentActions
               availableActions={detail.availableActions}
               onAction={handleAction}
+            />
+
+            <Divider orientation="left">Tệp đính kèm (Chứng từ, hóa đơn, biên bản)</Divider>
+            <DocumentAttachments
+              documentType="Receipt"
+              documentId={detail.id}
+              readonly={detail.status === 'Completed' || detail.status === 'Cancelled'}
             />
           </>
         )}

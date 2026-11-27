@@ -4,7 +4,7 @@ import {
   Divider, Tag, Modal, Form, InputNumber, Card
 } from 'antd';
 import {
-  PlusOutlined, ReloadOutlined, EyeOutlined, DeleteOutlined
+  PlusOutlined, ReloadOutlined, EyeOutlined, DeleteOutlined, DownloadOutlined
 } from '@ant-design/icons';
 import type {
   StockAdjustmentSummary, StockAdjustmentDetail, WarehouseResponse,
@@ -14,6 +14,8 @@ import {
   stockAdjustmentsApi, warehousesApi, productsApi, locationsApi, extractItems
 } from '../../api/services';
 import { StatusTag, DocumentActions } from '../../components/DocumentActions';
+import { DocumentAttachments } from '../../components/DocumentAttachments';
+import { exportToCsv } from '../../utils/exportReceipt';
 
 const REASON_OPTIONS = [
   { value: 0, label: 'Hư hỏng / Hỏng hóc' },
@@ -375,9 +377,28 @@ export default function StockAdjustmentsPage() {
       {/* Drawer Chi tiết Phiếu Điều Chỉnh */}
       <Drawer
         title={`Chi tiết phiếu điều chỉnh: ${detail?.documentNo || ''}`}
-        width={700}
+        width={720}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
+        extra={
+          <Button
+            icon={<DownloadOutlined />}
+            onClick={() => {
+              if (!detail) return;
+              const headers = ['Mã SP', 'Tên sản phẩm', 'Vị trí', 'Số lượng thay đổi', 'Ghi chú'];
+              const rows = (detail.lines || []).map(l => [
+                l.productSku,
+                l.productName,
+                l.locationCode,
+                l.adjustmentQuantity > 0 ? `+${l.adjustmentQuantity}` : l.adjustmentQuantity,
+                l.note || '',
+              ]);
+              exportToCsv(`DieuChinhKho_${detail.documentNo}`, headers, rows);
+            }}
+          >
+            Xuất CSV
+          </Button>
+        }
       >
         {detail && (
           <>
@@ -416,6 +437,13 @@ export default function StockAdjustmentsPage() {
             <DocumentActions
               availableActions={detail.availableActions}
               onAction={handleAction}
+            />
+
+            <Divider orientation="left">Tệp đính kèm (Biên bản kiểm tra, ảnh hiện trường)</Divider>
+            <DocumentAttachments
+              documentType="Adjustment"
+              documentId={detail.id}
+              readonly={detail.status === 'Completed' || detail.status === 'Cancelled'}
             />
           </>
         )}
