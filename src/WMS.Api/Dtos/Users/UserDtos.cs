@@ -21,6 +21,10 @@ public sealed record UserQuery : PagedRequest, IValidatableObject
         {
             yield return new ValidationResult("Page must be greater than or equal to 1.", [nameof(Page)]);
         }
+        else if (Offset > int.MaxValue)
+        {
+            yield return new ValidationResult("The requested page offset is too large.", [nameof(Page)]);
+        }
 
         if (PageSize is < 1 or > MaxPageSize)
         {

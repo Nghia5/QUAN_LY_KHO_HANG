@@ -10,7 +10,11 @@ public static class CommonRules
     {
         var fields = sortableFields.ToArray();
 
-        validator.RuleFor(request => request.Page).GreaterThanOrEqualTo(1);
+        validator.RuleFor(request => request.Page)
+            .Cascade(CascadeMode.Stop)
+            .GreaterThanOrEqualTo(1)
+            .Must((request, _) => request.Offset <= int.MaxValue)
+            .WithMessage("The requested page offset is too large.");
         validator.RuleFor(request => request.PageSize).InclusiveBetween(1, PagedRequest.MaxPageSize);
         validator.RuleFor(request => request.Keyword).MaximumLength(200);
         validator.RuleFor(request => request.SortDir)

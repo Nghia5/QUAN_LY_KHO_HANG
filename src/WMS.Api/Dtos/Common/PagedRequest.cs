@@ -20,6 +20,8 @@ public record PagedRequest
     public string? SortDir { get; init; }
 
     public bool IsDescending => string.Equals(SortDir, "desc", StringComparison.OrdinalIgnoreCase);
+
+    internal long Offset => ((long)Page - 1) * PageSize;
 }
 
 public sealed record PagedResult<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount)

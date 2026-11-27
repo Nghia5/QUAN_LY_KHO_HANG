@@ -29,8 +29,13 @@ public static class QueryableExtensions
         CancellationToken cancellationToken)
     {
         var totalCount = await query.CountAsync(cancellationToken);
+        if (request.Offset >= totalCount)
+        {
+            return new PagedResult<T>([], request.Page, request.PageSize, totalCount);
+        }
+
         var items = await query
-            .Skip((request.Page - 1) * request.PageSize)
+            .Skip((int)request.Offset)
             .Take(request.PageSize)
             .ToListAsync(cancellationToken);
 
