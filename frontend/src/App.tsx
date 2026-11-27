@@ -18,6 +18,8 @@ import StocktakesPage from './pages/stocktakes/StocktakesPage';
 import StockAdjustmentsPage from './pages/stock-adjustments/StockAdjustmentsPage';
 import StockMovementsPage from './pages/stock-movements/StockMovementsPage';
 import BatchesPage from './pages/batches/BatchesPage';
+import LocationsPage from './pages/locations/LocationsPage';
+import N8nAlertsPage from './pages/n8n/N8nAlertsPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuth();
@@ -40,6 +42,7 @@ function AppRoutes() {
         <Route path="products" element={<ProductsPage />} />
         <Route path="suppliers" element={<SuppliersPage />} />
         <Route path="warehouses" element={<WarehousesPage />} />
+        <Route path="locations" element={<LocationsPage />} />
         <Route path="inventory" element={<InventoryPage />} />
         <Route path="goods-receipts" element={<GoodsReceiptsPage />} />
         <Route path="goods-issues" element={<GoodsIssuesPage />} />
@@ -48,6 +51,7 @@ function AppRoutes() {
         <Route path="stock-adjustments" element={<StockAdjustmentsPage />} />
         <Route path="stock-movements" element={<StockMovementsPage />} />
         <Route path="batches" element={<BatchesPage />} />
+        <Route path="n8n-alerts" element={<N8nAlertsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

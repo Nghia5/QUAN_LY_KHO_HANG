@@ -6,6 +6,7 @@ import {
   TeamOutlined, SafetyOutlined, ImportOutlined, ExportOutlined,
   SyncOutlined, FileSearchOutlined, ToolOutlined, ExperimentOutlined,
   LogoutOutlined, SettingOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
+  ApartmentOutlined, ThunderboltOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -25,6 +26,7 @@ const menuItems = [
     key: 'warehouse', icon: <ShopOutlined />, label: 'Kho hàng',
     children: [
       { key: '/warehouses', icon: <ShopOutlined />, label: 'Danh sách kho' },
+      { key: '/locations', icon: <ApartmentOutlined />, label: 'Vị trí kho' },
       { key: '/inventory', icon: <BarChartOutlined />, label: 'Tồn kho' },
     ],
   },
@@ -43,6 +45,12 @@ const menuItems = [
     children: [
       { key: '/stock-movements', icon: <BarChartOutlined />, label: 'Lịch sử kho' },
       { key: '/batches', icon: <ExperimentOutlined />, label: 'Lô / Hạn dùng' },
+    ],
+  },
+  {
+    key: 'automation', icon: <ThunderboltOutlined />, label: 'Tự động hóa',
+    children: [
+      { key: '/n8n-alerts', icon: <ThunderboltOutlined />, label: 'Cảnh báo N8N' },
     ],
   },
   {
@@ -84,7 +92,7 @@ export default function AppLayout() {
         <Menu
           mode="inline"
           selectedKeys={[location.pathname]}
-          defaultOpenKeys={['master', 'warehouse', 'operations', 'reports', 'admin']}
+          defaultOpenKeys={['master', 'warehouse', 'operations', 'reports', 'automation', 'admin']}
           items={menuItems}
           onClick={({ key }) => navigate(key)}
           style={{ borderRight: 0 }}

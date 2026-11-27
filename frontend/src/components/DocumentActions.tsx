@@ -16,33 +16,58 @@ export function StatusTag({ status }: { status: DocumentStatus }) {
 }
 
 interface Props {
-  actions: DocumentAction[];
+  actions?: DocumentAction[];
+  availableActions?: DocumentAction[];
   onAction: (action: string, reason?: string) => Promise<void>;
 }
 
-export function DocumentActions({ actions, onAction }: Props) {
+export function DocumentActions({ actions, availableActions, onAction }: Props) {
   const [reason, setReason] = useState('');
   const [acting, setActing] = useState('');
 
+  const actionList = actions || availableActions || [];
+
   const handle = async (action: string, needsReason: boolean) => {
     setActing(action);
-    try { await onAction(action, needsReason ? reason : undefined); message.success('Thao tác thành công'); setReason(''); }
-    catch (err: any) { message.error(err.response?.data?.message || 'Lỗi'); }
-    finally { setActing(''); }
+    try {
+      await onAction(action, needsReason ? reason : undefined);
+      message.success('Thao tác thành công');
+      setReason('');
+    } catch (err: any) {
+      message.error(err.response?.data?.message || 'Lỗi');
+    } finally {
+      setActing('');
+    }
   };
 
   const needsReason = (a: string) => ['reject', 'cancel'].includes(a);
 
   return (
     <Space wrap>
-      {actions.map(a => needsReason(a.action) ? (
-        <Popconfirm key={a.action} title={`Lý do ${a.label}?`} description={<Input.TextArea value={reason} onChange={e => setReason(e.target.value)} rows={2} />}
-          onConfirm={() => handle(a.action, true)} okText="Xác nhận" disabled={!reason}>
+      {actionList.map(a => needsReason(a.action) ? (
+        <Popconfirm
+          key={a.action}
+          title={`Lý do ${a.label}?`}
+          description={<Input.TextArea value={reason} onChange={e => setReason(e.target.value)} rows={2} />}
+          onConfirm={() => handle(a.action, true)}
+          okText="Xác nhận"
+          disabled={!reason}
+        >
           <Button danger loading={acting === a.action}>{a.label}</Button>
         </Popconfirm>
       ) : (
-        <Popconfirm key={a.action} title={`Xác nhận ${a.label}?`} onConfirm={() => handle(a.action, false)} okText="Xác nhận">
-          <Button type={a.action === 'approve' || a.action === 'complete' ? 'primary' : 'default'} loading={acting === a.action}>{a.label}</Button>
+        <Popconfirm
+          key={a.action}
+          title={`Xác nhận ${a.label}?`}
+          onConfirm={() => handle(a.action, false)}
+          okText="Xác nhận"
+        >
+          <Button
+            type={a.action === 'approve' || a.action === 'complete' ? 'primary' : 'default'}
+            loading={acting === a.action}
+          >
+            {a.label}
+          </Button>
         </Popconfirm>
       ))}
     </Space>
