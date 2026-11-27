@@ -38,8 +38,18 @@ export default function ProductsPage() {
     setLoading(true);
     try {
       const { data: res } = await productsApi.list(params);
-      setData(res.items);
-      setTotal(res.totalCount);
+      const rawList: ProductResponse[] = Array.isArray(res) ? res : ((res as any)?.items || []);
+      let filtered = rawList;
+      if (params.keyword) {
+        const kw = params.keyword.toLowerCase().trim();
+        filtered = filtered.filter(p =>
+          (p.sku && p.sku.toLowerCase().includes(kw)) ||
+          (p.name && p.name.toLowerCase().includes(kw)) ||
+          (p.category && p.category.toLowerCase().includes(kw))
+        );
+      }
+      setData(filtered);
+      setTotal(filtered.length);
     } catch {
       message.error('Không thể tải danh sách sản phẩm');
     } finally {
@@ -203,11 +213,13 @@ export default function ProductsPage() {
       title: 'SKU',
       dataIndex: 'sku',
       width: 130,
+      sorter: (a: ProductResponse, b: ProductResponse) => (a.sku || '').localeCompare(b.sku || ''),
       render: (v: string) => <b>{v}</b>,
     },
     {
       title: 'Tên sản phẩm (Inline Edit)',
       dataIndex: 'name',
+      sorter: (a: ProductResponse, b: ProductResponse) => (a.name || '').localeCompare(b.name || ''),
       render: (v: string, r: ProductResponse) => {
         const isEditing = r.id === editingId;
         return isEditing ? (
@@ -225,6 +237,7 @@ export default function ProductsPage() {
       title: 'Danh mục',
       dataIndex: 'category',
       width: 140,
+      sorter: (a: ProductResponse, b: ProductResponse) => (a.category || '').localeCompare(b.category || ''),
       render: (v: string, r: ProductResponse) => {
         const isEditing = r.id === editingId;
         return isEditing ? (
@@ -259,6 +272,7 @@ export default function ProductsPage() {
       title: 'Giá bán (₫)',
       dataIndex: 'salePrice',
       width: 140,
+      sorter: (a: ProductResponse, b: ProductResponse) => (a.salePrice || 0) - (b.salePrice || 0),
       render: (v: number, r: ProductResponse) => {
         const isEditing = r.id === editingId;
         const val = v ?? 0;
@@ -277,6 +291,7 @@ export default function ProductsPage() {
       title: 'Trạng thái',
       dataIndex: 'isActive',
       width: 130,
+      sorter: (a: ProductResponse, b: ProductResponse) => Number(a.isActive) - Number(b.isActive),
       render: (v: boolean, r: ProductResponse) => {
         const isEditing = r.id === editingId;
         const active = v ?? true;

@@ -15,8 +15,26 @@ export default function SuppliersPage() {
 
   const fetchData = async () => {
     setLoading(true);
-    try { const { data: res } = await suppliersApi.list(params); setData(res.items); setTotal(res.totalCount); }
-    catch { message.error('Lỗi'); } finally { setLoading(false); }
+    try {
+      const { data: res } = await suppliersApi.list(params);
+      const rawList: SupplierResponse[] = Array.isArray(res) ? res : ((res as any)?.items || []);
+      let filtered = rawList;
+      if (params.keyword) {
+        const kw = params.keyword.toLowerCase().trim();
+        filtered = filtered.filter(s =>
+          (s.code && s.code.toLowerCase().includes(kw)) ||
+          (s.name && s.name.toLowerCase().includes(kw)) ||
+          (s.phone && s.phone.includes(kw)) ||
+          (s.email && s.email.toLowerCase().includes(kw))
+        );
+      }
+      setData(filtered);
+      setTotal(filtered.length);
+    } catch {
+      message.error('Không thể tải danh sách nhà cung cấp');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { fetchData(); }, [params]);
@@ -30,12 +48,26 @@ export default function SuppliersPage() {
   };
 
   const columns = [
-    { title: 'Mã', dataIndex: 'code', width: 100 },
-    { title: 'Tên NCC', dataIndex: 'name' },
+    {
+      title: 'Mã',
+      dataIndex: 'code',
+      width: 100,
+      sorter: (a: SupplierResponse, b: SupplierResponse) => (a.code || '').localeCompare(b.code || ''),
+    },
+    {
+      title: 'Tên NCC',
+      dataIndex: 'name',
+      sorter: (a: SupplierResponse, b: SupplierResponse) => (a.name || '').localeCompare(b.name || ''),
+    },
     { title: 'SĐT', dataIndex: 'phone' },
     { title: 'Email', dataIndex: 'email' },
     { title: 'Địa chỉ', dataIndex: 'address', ellipsis: true },
-    { title: 'Trạng thái', dataIndex: 'isActive', render: (v: boolean) => <Tag color={v ? 'green' : 'red'}>{v ? 'Hoạt động' : 'Ngừng'}</Tag> },
+    {
+      title: 'Trạng thái',
+      dataIndex: 'isActive',
+      sorter: (a: SupplierResponse, b: SupplierResponse) => Number(a.isActive) - Number(b.isActive),
+      render: (v: boolean) => <Tag color={v ? 'green' : 'red'}>{v ? 'Hoạt động' : 'Ngừng'}</Tag>
+    },
     {
       title: 'Thao tác', render: (_: any, r: SupplierResponse) => (
         <Space>
