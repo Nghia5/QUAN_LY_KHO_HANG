@@ -11,7 +11,7 @@ import type {
   SupplierResponse, ProductResponse, LocationResponse
 } from '../../types';
 import {
-  goodsReceiptsApi, warehousesApi, suppliersApi, productsApi, locationsApi
+  goodsReceiptsApi, warehousesApi, suppliersApi, productsApi, locationsApi, extractItems
 } from '../../api/services';
 import { StatusTag, DocumentActions } from '../../components/DocumentActions';
 
@@ -47,9 +47,9 @@ export default function GoodsReceiptsPage() {
   }, [params]);
 
   useEffect(() => {
-    warehousesApi.list({ pageSize: 100 }).then(r => setWarehouses(r.data.items)).catch(() => {});
-    suppliersApi.list({ pageSize: 100 }).then(r => setSuppliers(r.data.items)).catch(() => {});
-    productsApi.list({ pageSize: 100 }).then(r => setProducts(r.data.items)).catch(() => {});
+    warehousesApi.list({ pageSize: 100 }).then(r => setWarehouses(extractItems(r.data))).catch(() => setWarehouses([]));
+    suppliersApi.list({ pageSize: 100 }).then(r => setSuppliers(extractItems(r.data))).catch(() => setSuppliers([]));
+    productsApi.list({ pageSize: 100 }).then(r => setProducts(extractItems(r.data))).catch(() => setProducts([]));
   }, []);
 
   useEffect(() => {
@@ -60,8 +60,8 @@ export default function GoodsReceiptsPage() {
   useEffect(() => {
     if (selectedWarehouseForCreate) {
       locationsApi.list(selectedWarehouseForCreate, { pageSize: 100 })
-        .then(r => setLocations(r.data.items))
-        .catch(() => {});
+        .then(r => setLocations(extractItems(r.data)))
+        .catch(() => setLocations([]));
     } else {
       setLocations([]);
     }
@@ -176,14 +176,14 @@ export default function GoodsReceiptsPage() {
             allowClear
             style={{ width: 200 }}
             onChange={(v) => setParams(p => ({ ...p, warehouseId: v, page: 1 }))}
-            options={warehouses.map(w => ({ value: w.id, label: w.name }))}
+            options={(warehouses || []).map(w => ({ value: w.id, label: w.name }))}
           />
           <Select
             placeholder="Lọc theo NCC"
             allowClear
             style={{ width: 220 }}
             onChange={(v) => setParams(p => ({ ...p, supplierId: v, page: 1 }))}
-            options={suppliers.map(s => ({ value: s.id, label: s.name }))}
+            options={(suppliers || []).map(s => ({ value: s.id, label: s.name }))}
           />
         </Space>
       </Card>
@@ -222,7 +222,7 @@ export default function GoodsReceiptsPage() {
             >
               <Select
                 placeholder="Chọn kho hàng nhận"
-                options={warehouses.map(w => ({ value: w.id, label: `${w.name} (${w.code})` }))}
+                options={(warehouses || []).map(w => ({ value: w.id, label: `${w.name} (${w.code})` }))}
                 onChange={(val) => {
                   setSelectedWarehouseForCreate(val);
                 }}
@@ -236,7 +236,7 @@ export default function GoodsReceiptsPage() {
             >
               <Select
                 placeholder="Chọn nhà cung cấp"
-                options={suppliers.map(s => ({ value: s.id, label: `${s.name} (${s.code})` }))}
+                options={(suppliers || []).map(s => ({ value: s.id, label: `${s.name} (${s.code})` }))}
               />
             </Form.Item>
           </div>
@@ -267,7 +267,7 @@ export default function GoodsReceiptsPage() {
                         placeholder="Chọn sản phẩm"
                         showSearch
                         optionFilterProp="label"
-                        options={products.map(p => ({ value: p.id, label: `${p.sku} - ${p.name}` }))}
+                        options={(products || []).map(p => ({ value: p.id, label: `${p.sku} - ${p.name}` }))}
                       />
                     </Form.Item>
 
@@ -279,7 +279,7 @@ export default function GoodsReceiptsPage() {
                     >
                       <Select
                         placeholder="Vị trí ô chứa"
-                        options={locations.map(l => ({ value: l.id, label: `${l.code} - ${l.name}` }))}
+                        options={(locations || []).map(l => ({ value: l.id, label: `${l.code} - ${l.name}` }))}
                         disabled={!selectedWarehouseForCreate}
                       />
                     </Form.Item>

@@ -1,4 +1,11 @@
 import api from './client';
+
+export function extractItems<T>(data: any): T[] {
+  if (!data) return [];
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data.items)) return data.items;
+  return [];
+}
 import type {
   LoginRequest, AuthResponse, CurrentUserProfile,
   PagedResult, UserResponse, CreateUserRequest, UpdateUserRequest,

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Table, Input, Select, Space, Button, Tag, message } from 'antd';
 import { ReloadOutlined } from '@ant-design/icons';
 import type { StockMovementResponse, WarehouseResponse } from '../../types';
-import { stockMovementsApi, warehousesApi } from '../../api/services';
+import { stockMovementsApi, warehousesApi, extractItems } from '../../api/services';
 
 const movementTypeLabels: Record<number, { text: string; color: string }> = {
   1: { text: 'Nhập', color: 'green' }, 2: { text: 'Xuất', color: 'red' },
@@ -23,7 +23,7 @@ export default function StockMovementsPage() {
     catch { message.error('Lỗi'); } finally { setLoading(false); }
   };
 
-  useEffect(() => { warehousesApi.list({ pageSize: 100 }).then(r => setWarehouses(r.data.items)).catch(() => {}); }, []);
+  useEffect(() => { warehousesApi.list({ pageSize: 100 }).then(r => setWarehouses(extractItems(r.data))).catch(() => setWarehouses([])); }, []);
   useEffect(() => { fetchData(); }, [params]);
 
   const columns = [

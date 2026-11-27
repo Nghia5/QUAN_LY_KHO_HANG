@@ -7,7 +7,7 @@ import {
   PlusOutlined, ReloadOutlined, DeleteOutlined
 } from '@ant-design/icons';
 import type { WarehouseResponse, LocationResponse, LocationTreeNode, LocationType } from '../../types';
-import { warehousesApi, locationsApi } from '../../api/services';
+import { warehousesApi, locationsApi, extractItems } from '../../api/services';
 
 const LOCATION_TYPES: { value: LocationType; label: string; color: string; level: number }[] = [
   { value: 'Zone', label: 'Zone (Khu vực)', color: 'blue', level: 1 },
@@ -34,9 +34,10 @@ export default function LocationsPage() {
     const fetchWarehouses = async () => {
       try {
         const { data } = await warehousesApi.list({ page: 1, pageSize: 100 });
-        setWarehouses(data.items);
-        if (data.items.length > 0) {
-          setSelectedWarehouseId(data.items[0].id);
+        const items = extractItems<WarehouseResponse>(data);
+        setWarehouses(items);
+        if (items.length > 0) {
+          setSelectedWarehouseId(items[0].id);
         }
       } catch {
         message.error('Không thể tải danh sách kho');
@@ -54,7 +55,7 @@ export default function LocationsPage() {
         locationsApi.list(selectedWarehouseId, { page: 1, pageSize: 100 }),
         locationsApi.tree(selectedWarehouseId),
       ]);
-      setLocations(listRes.data.items);
+      setLocations(extractItems(listRes.data));
       setTreeData(treeRes.data);
     } catch {
       message.error('Lỗi khi tải danh sách vị trí kho');
@@ -164,7 +165,7 @@ export default function LocationsPage() {
               placeholder="Chọn kho hàng"
               value={selectedWarehouseId}
               onChange={(val) => setSelectedWarehouseId(val)}
-              options={warehouses.map(w => ({ value: w.id, label: `🏭 ${w.name} (${w.code})` }))}
+              options={(warehouses || []).map(w => ({ value: w.id, label: `🏭 ${w.name} (${w.code})` }))}
             />
             <Button icon={<ReloadOutlined />} onClick={fetchLocations} />
             <Button

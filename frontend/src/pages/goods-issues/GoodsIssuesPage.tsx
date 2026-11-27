@@ -11,7 +11,7 @@ import type {
   ProductResponse, LocationResponse
 } from '../../types';
 import {
-  goodsIssuesApi, warehousesApi, productsApi, locationsApi
+  goodsIssuesApi, warehousesApi, productsApi, locationsApi, extractItems
 } from '../../api/services';
 import { StatusTag, DocumentActions } from '../../components/DocumentActions';
 
@@ -46,8 +46,8 @@ export default function GoodsIssuesPage() {
   }, [params]);
 
   useEffect(() => {
-    warehousesApi.list({ pageSize: 100 }).then(r => setWarehouses(r.data.items)).catch(() => {});
-    productsApi.list({ pageSize: 100 }).then(r => setProducts(r.data.items)).catch(() => {});
+    warehousesApi.list({ pageSize: 100 }).then(r => setWarehouses(extractItems(r.data))).catch(() => setWarehouses([]));
+    productsApi.list({ pageSize: 100 }).then(r => setProducts(extractItems(r.data))).catch(() => setProducts([]));
   }, []);
 
   useEffect(() => {
@@ -57,8 +57,8 @@ export default function GoodsIssuesPage() {
   useEffect(() => {
     if (selectedWarehouseForCreate) {
       locationsApi.list(selectedWarehouseForCreate, { pageSize: 100 })
-        .then(r => setLocations(r.data.items))
-        .catch(() => {});
+        .then(r => setLocations(extractItems(r.data)))
+        .catch(() => setLocations([]));
     } else {
       setLocations([]);
     }
@@ -169,7 +169,7 @@ export default function GoodsIssuesPage() {
             allowClear
             style={{ width: 220 }}
             onChange={(v) => setParams(p => ({ ...p, warehouseId: v, page: 1 }))}
-            options={warehouses.map(w => ({ value: w.id, label: w.name }))}
+            options={(warehouses || []).map(w => ({ value: w.id, label: w.name }))}
           />
         </Space>
       </Card>
@@ -208,7 +208,7 @@ export default function GoodsIssuesPage() {
             >
               <Select
                 placeholder="Chọn kho hàng xuất"
-                options={warehouses.map(w => ({ value: w.id, label: `${w.name} (${w.code})` }))}
+                options={(warehouses || []).map(w => ({ value: w.id, label: `${w.name} (${w.code})` }))}
                 onChange={(val) => setSelectedWarehouseForCreate(val)}
               />
             </Form.Item>
@@ -248,7 +248,7 @@ export default function GoodsIssuesPage() {
                         placeholder="Chọn sản phẩm"
                         showSearch
                         optionFilterProp="label"
-                        options={products.map(p => ({ value: p.id, label: `${p.sku} - ${p.name}` }))}
+                        options={(products || []).map(p => ({ value: p.id, label: `${p.sku} - ${p.name}` }))}
                       />
                     </Form.Item>
 
@@ -260,7 +260,7 @@ export default function GoodsIssuesPage() {
                     >
                       <Select
                         placeholder="Vị trí lấy hàng"
-                        options={locations.map(l => ({ value: l.id, label: `${l.code} - ${l.name}` }))}
+                        options={(locations || []).map(l => ({ value: l.id, label: `${l.code} - ${l.name}` }))}
                         disabled={!selectedWarehouseForCreate}
                       />
                     </Form.Item>

@@ -11,7 +11,7 @@ import type {
   ProductResponse, LocationResponse
 } from '../../types';
 import {
-  stockAdjustmentsApi, warehousesApi, productsApi, locationsApi
+  stockAdjustmentsApi, warehousesApi, productsApi, locationsApi, extractItems
 } from '../../api/services';
 import { StatusTag, DocumentActions } from '../../components/DocumentActions';
 
@@ -62,8 +62,8 @@ export default function StockAdjustmentsPage() {
   }, [params]);
 
   useEffect(() => {
-    warehousesApi.list({ pageSize: 100 }).then(r => setWarehouses(r.data.items)).catch(() => {});
-    productsApi.list({ pageSize: 100 }).then(r => setProducts(r.data.items)).catch(() => {});
+    warehousesApi.list({ pageSize: 100 }).then(r => setWarehouses(extractItems(r.data))).catch(() => setWarehouses([]));
+    productsApi.list({ pageSize: 100 }).then(r => setProducts(extractItems(r.data))).catch(() => setProducts([]));
   }, []);
 
   useEffect(() => {
@@ -73,8 +73,8 @@ export default function StockAdjustmentsPage() {
   useEffect(() => {
     if (selectedWarehouseForCreate) {
       locationsApi.list(selectedWarehouseForCreate, { pageSize: 100 })
-        .then(r => setLocations(r.data.items))
-        .catch(() => {});
+        .then(r => setLocations(extractItems(r.data)))
+        .catch(() => setLocations([]));
     } else {
       setLocations([]);
     }
@@ -201,7 +201,7 @@ export default function StockAdjustmentsPage() {
             allowClear
             style={{ width: 200 }}
             onChange={(v) => setParams(p => ({ ...p, warehouseId: v, page: 1 }))}
-            options={warehouses.map(w => ({ value: w.id, label: w.name }))}
+            options={(warehouses || []).map(w => ({ value: w.id, label: w.name }))}
           />
         </Space>
       </Card>
@@ -240,7 +240,7 @@ export default function StockAdjustmentsPage() {
             >
               <Select
                 placeholder="Chọn kho hàng"
-                options={warehouses.map(w => ({ value: w.id, label: `${w.name} (${w.code})` }))}
+                options={(warehouses || []).map(w => ({ value: w.id, label: `${w.name} (${w.code})` }))}
                 onChange={(val) => setSelectedWarehouseForCreate(val)}
               />
             </Form.Item>
@@ -284,7 +284,7 @@ export default function StockAdjustmentsPage() {
                         placeholder="Chọn sản phẩm"
                         showSearch
                         optionFilterProp="label"
-                        options={products.map(p => ({ value: p.id, label: `${p.sku} - ${p.name}` }))}
+                        options={(products || []).map(p => ({ value: p.id, label: `${p.sku} - ${p.name}` }))}
                       />
                     </Form.Item>
 
@@ -296,7 +296,7 @@ export default function StockAdjustmentsPage() {
                     >
                       <Select
                         placeholder="Vị trí ô chứa"
-                        options={locations.map(l => ({ value: l.id, label: `${l.code} - ${l.name}` }))}
+                        options={(locations || []).map(l => ({ value: l.id, label: `${l.code} - ${l.name}` }))}
                         disabled={!selectedWarehouseForCreate}
                       />
                     </Form.Item>

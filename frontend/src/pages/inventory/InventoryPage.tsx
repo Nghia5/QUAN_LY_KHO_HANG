@@ -8,7 +8,7 @@ import {
   ToolOutlined, SearchOutlined
 } from '@ant-design/icons';
 import type { InventoryResponse, WarehouseResponse } from '../../types';
-import { inventoryApi, warehousesApi, stockAdjustmentsApi } from '../../api/services';
+import { inventoryApi, warehousesApi, stockAdjustmentsApi, extractItems } from '../../api/services';
 import axios from 'axios';
 
 const stockStatusMap: Record<number, { text: string; color: string }> = {
@@ -46,7 +46,7 @@ export default function InventoryPage() {
   };
 
   useEffect(() => {
-    warehousesApi.list({ pageSize: 100 }).then(r => setWarehouses(r.data.items)).catch(() => {});
+    warehousesApi.list({ pageSize: 100 }).then(r => setWarehouses(extractItems(r.data))).catch(() => setWarehouses([]));
   }, []);
 
   useEffect(() => {
@@ -179,7 +179,7 @@ export default function InventoryPage() {
               allowClear
               style={{ width: 220 }}
               onChange={(v) => setParams(p => ({ ...p, warehouseId: v, page: 1 }))}
-              options={warehouses.map(w => ({ value: w.id, label: `${w.name} (${w.code})` }))}
+              options={(warehouses || []).map(w => ({ value: w.id, label: `${w.name} (${w.code})` }))}
             />
             <Select
               placeholder="Tình trạng tồn"

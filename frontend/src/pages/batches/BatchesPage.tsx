@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Table, Input, Select, Space, Button, Tag, message, Tabs } from 'antd';
 import { ReloadOutlined, WarningOutlined } from '@ant-design/icons';
 import type { BatchResponse, ExpiryAlertRow, WarehouseResponse } from '../../types';
-import { batchesApi, warehousesApi } from '../../api/services';
+import { batchesApi, warehousesApi, extractItems } from '../../api/services';
 
 const expiryLabels: Record<number, { text: string; color: string }> = {
   1: { text: 'Không HSD', color: 'default' }, 2: { text: 'Còn hạn', color: 'green' },
@@ -29,7 +29,7 @@ export default function BatchesPage() {
     try { const { data: res } = await batchesApi.expiryAlerts(alertParams); setAlerts(res.items); setAlertTotal(res.totalCount); } catch {}
   };
 
-  useEffect(() => { warehousesApi.list({ pageSize: 100 }).then(r => setWarehouses(r.data.items)).catch(() => {}); }, []);
+  useEffect(() => { warehousesApi.list({ pageSize: 100 }).then(r => setWarehouses(extractItems(r.data))).catch(() => setWarehouses([])); }, []);
   useEffect(() => { fetchData(); }, [params]);
   useEffect(() => { fetchAlerts(); }, [alertParams]);
 

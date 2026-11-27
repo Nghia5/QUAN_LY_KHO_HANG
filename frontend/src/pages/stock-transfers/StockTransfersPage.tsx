@@ -11,7 +11,7 @@ import type {
   ProductResponse, LocationResponse
 } from '../../types';
 import {
-  stockTransfersApi, warehousesApi, productsApi, locationsApi
+  stockTransfersApi, warehousesApi, productsApi, locationsApi, extractItems
 } from '../../api/services';
 import { StatusTag, DocumentActions } from '../../components/DocumentActions';
 
@@ -48,8 +48,8 @@ export default function StockTransfersPage() {
   }, [params]);
 
   useEffect(() => {
-    warehousesApi.list({ pageSize: 100 }).then(r => setWarehouses(r.data.items)).catch(() => {});
-    productsApi.list({ pageSize: 100 }).then(r => setProducts(r.data.items)).catch(() => {});
+    warehousesApi.list({ pageSize: 100 }).then(r => setWarehouses(extractItems(r.data))).catch(() => setWarehouses([]));
+    productsApi.list({ pageSize: 100 }).then(r => setProducts(extractItems(r.data))).catch(() => setProducts([]));
   }, []);
 
   useEffect(() => {
@@ -59,7 +59,7 @@ export default function StockTransfersPage() {
   // Load vị trí khi chọn kho nguồn / đích
   useEffect(() => {
     if (selectedSourceWh) {
-      locationsApi.list(selectedSourceWh, { pageSize: 100 }).then(r => setSourceLocations(r.data.items)).catch(() => {});
+      locationsApi.list(selectedSourceWh, { pageSize: 100 }).then(r => setSourceLocations(extractItems(r.data))).catch(() => setSourceLocations([]));
     } else {
       setSourceLocations([]);
     }
@@ -67,7 +67,7 @@ export default function StockTransfersPage() {
 
   useEffect(() => {
     if (selectedDestWh) {
-      locationsApi.list(selectedDestWh, { pageSize: 100 }).then(r => setDestLocations(r.data.items)).catch(() => {});
+      locationsApi.list(selectedDestWh, { pageSize: 100 }).then(r => setDestLocations(extractItems(r.data))).catch(() => setDestLocations([]));
     } else {
       setDestLocations([]);
     }
@@ -192,7 +192,7 @@ export default function StockTransfersPage() {
             allowClear
             style={{ width: 200 }}
             onChange={(v) => setParams(p => ({ ...p, warehouseId: v, page: 1 }))}
-            options={warehouses.map(w => ({ value: w.id, label: w.name }))}
+            options={(warehouses || []).map(w => ({ value: w.id, label: w.name }))}
           />
         </Space>
       </Card>
@@ -231,7 +231,7 @@ export default function StockTransfersPage() {
             >
               <Select
                 placeholder="Chọn kho nguồn"
-                options={warehouses.map(w => ({ value: w.id, label: `${w.name} (${w.code})` }))}
+                options={(warehouses || []).map(w => ({ value: w.id, label: `${w.name} (${w.code})` }))}
                 onChange={(val) => setSelectedSourceWh(val)}
               />
             </Form.Item>
@@ -243,7 +243,7 @@ export default function StockTransfersPage() {
             >
               <Select
                 placeholder="Chọn kho nhận đến"
-                options={warehouses.map(w => ({ value: w.id, label: `${w.name} (${w.code})` }))}
+                options={(warehouses || []).map(w => ({ value: w.id, label: `${w.name} (${w.code})` }))}
                 onChange={(val) => setSelectedDestWh(val)}
               />
             </Form.Item>
@@ -275,19 +275,19 @@ export default function StockTransfersPage() {
                         placeholder="Chọn sản phẩm"
                         showSearch
                         optionFilterProp="label"
-                        options={products.map(p => ({ value: p.id, label: `${p.sku} - ${p.name}` }))}
+                        options={(products || []).map(p => ({ value: p.id, label: `${p.sku} - ${p.name}` }))}
                       />
                     </Form.Item>
 
                     <Form.Item
                       {...restField}
                       name={[name, 'sourceLocationId']}
-                      rules={[{ required: true, message: 'Vị trí đi' }]}
+                      rules={[{ required: true, message: 'Vui lòng chọn vị trí đi' }]}
                       style={{ flex: 3, margin: 0 }}
                     >
                       <Select
                         placeholder="Vị trí lấy hàng"
-                        options={sourceLocations.map(l => ({ value: l.id, label: `${l.code} - ${l.name}` }))}
+                        options={(sourceLocations || []).map(l => ({ value: l.id, label: `${l.code} - ${l.name}` }))}
                         disabled={!selectedSourceWh}
                       />
                     </Form.Item>
@@ -295,12 +295,12 @@ export default function StockTransfersPage() {
                     <Form.Item
                       {...restField}
                       name={[name, 'destinationLocationId']}
-                      rules={[{ required: true, message: 'Vị trí đến' }]}
+                      rules={[{ required: true, message: 'Vui lòng chọn vị trí đến' }]}
                       style={{ flex: 3, margin: 0 }}
                     >
                       <Select
                         placeholder="Vị trí cất hàng"
-                        options={destLocations.map(l => ({ value: l.id, label: `${l.code} - ${l.name}` }))}
+                        options={(destLocations || []).map(l => ({ value: l.id, label: `${l.code} - ${l.name}` }))}
                         disabled={!selectedDestWh}
                       />
                     </Form.Item>
