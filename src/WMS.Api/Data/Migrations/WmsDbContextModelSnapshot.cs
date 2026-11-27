@@ -1162,6 +1162,9 @@ namespace WMS.Api.Data.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<int?>("SupplierId")
+                        .HasColumnType("int");
+
                     b.Property<string>("UnitOfMeasure")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -1171,6 +1174,8 @@ namespace WMS.Api.Data.Migrations
 
                     b.HasIndex("Sku")
                         .IsUnique();
+
+                    b.HasIndex("SupplierId");
 
                     b.ToTable("Products");
                 });
@@ -2046,6 +2051,16 @@ namespace WMS.Api.Data.Migrations
                     b.Navigation("Batch");
 
                     b.Navigation("Inventory");
+                });
+
+            modelBuilder.Entity("WMS.Api.Models.Product", b =>
+                {
+                    b.HasOne("WMS.Api.Models.SupplierModel", "Supplier")
+                        .WithMany()
+                        .HasForeignKey("SupplierId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Supplier");
                 });
 
             modelBuilder.Entity("WMS.Api.Models.RefreshToken", b =>

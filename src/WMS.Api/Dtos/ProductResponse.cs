@@ -9,4 +9,7 @@ public sealed record ProductResponse(
     string Category,
     string UnitOfMeasure,
     decimal SalePrice,
-    bool IsActive);
+    bool IsActive,
+    int? SupplierId = null,
+    string? SupplierCode = null,
+    string? SupplierName = null);

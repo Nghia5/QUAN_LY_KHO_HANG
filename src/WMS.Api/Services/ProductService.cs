@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using WMS.Api.Data;
@@ -15,7 +16,7 @@ public sealed class ProductService(WmsDbContext dbContext) : IProductService
         return await dbContext.Products
             .AsNoTracking()
             .OrderBy(product => product.Name)
-            .Select(product => ToResponse(product))
+            .Select(Projection)
             .ToListAsync(cancellationToken);
     }
 
@@ -23,17 +24,19 @@ public sealed class ProductService(WmsDbContext dbContext) : IProductService
         int id,
         CancellationToken cancellationToken)
     {
-        var product = await dbContext.Products
+        return await dbContext.Products
             .AsNoTracking()
-            .SingleOrDefaultAsync(product => product.Id == id, cancellationToken);
-
-        return product is null ? null : ToResponse(product);
+            .Where(product => product.Id == id)
+            .Select(Projection)
+            .SingleOrDefaultAsync(cancellationToken);
     }
 
     public async Task<ProductResponse> CreateAsync(
         CreateProductRequest request,
         CancellationToken cancellationToken)
     {
+        await EnsureSupplierUsableAsync(request.SupplierId, null, cancellationToken);
+
         var product = new Product
         {
             Sku = request.Sku.Trim(),
@@ -42,13 +45,14 @@ public sealed class ProductService(WmsDbContext dbContext) : IProductService
             Category = request.Category.Trim(),
             UnitOfMeasure = request.UnitOfMeasure.Trim(),
             SalePrice = request.SalePrice,
-            IsActive = request.IsActive
+            IsActive = request.IsActive,
+            SupplierId = request.SupplierId
         };
 
         dbContext.Products.Add(product);
         await SaveChangesAsync(cancellationToken);
 
-        return ToResponse(product);
+        return (await GetByIdAsync(product.Id, cancellationToken))!;
     }
 
     public async Task<ProductResponse?> UpdateAsync(
@@ -64,6 +68,8 @@ public sealed class ProductService(WmsDbContext dbContext) : IProductService
             return null;
         }
 
+        await EnsureSupplierUsableAsync(request.SupplierId, product.SupplierId, cancellationToken);
+
         product.Sku = request.Sku.Trim();
         product.Name = request.Name.Trim();
         product.Description = request.Description?.Trim();
@@ -71,10 +77,11 @@ public sealed class ProductService(WmsDbContext dbContext) : IProductService
         product.UnitOfMeasure = request.UnitOfMeasure.Trim();
         product.SalePrice = request.SalePrice;
         product.IsActive = request.IsActive;
+        product.SupplierId = request.SupplierId;
 
         await SaveChangesAsync(cancellationToken);
 
-        return ToResponse(product);
+        return await GetByIdAsync(id, cancellationToken);
     }
 
     public async Task<bool> DeleteAsync(int id, CancellationToken cancellationToken)
@@ -114,8 +121,32 @@ public sealed class ProductService(WmsDbContext dbContext) : IProductService
         }
     }
 
-    private static ProductResponse ToResponse(Product product) =>
-        new(
+    /// <summary>
+    /// A newly chosen supplier must exist and be active. Keeping the current supplier is always
+    /// allowed, so products of a supplier that was deactivated later can still be edited.
+    /// </summary>
+    private async Task EnsureSupplierUsableAsync(int? supplierId, int? currentSupplierId, CancellationToken cancellationToken)
+    {
+        if (supplierId is not int id || id == currentSupplierId)
+        {
+            return;
+        }
+
+        var supplier = await dbContext.Set<SupplierModel>()
+            .AsNoTracking()
+            .Where(s => s.Id == id)
+            .Select(s => new { s.Code, s.IsActive })
+            .SingleOrDefaultAsync(cancellationToken)
+            ?? throw new BusinessRuleException($"Supplier {id} does not exist.");
+
+        if (!supplier.IsActive)
+        {
+            throw new BusinessRuleException($"Supplier {supplier.Code} is inactive.");
+        }
+    }
+
+    private static readonly Expression<Func<Product, ProductResponse>> Projection = product =>
+        new ProductResponse(
             product.Id,
             product.Sku,
             product.Name,
@@ -123,5 +154,8 @@ public sealed class ProductService(WmsDbContext dbContext) : IProductService
             product.Category,
             product.UnitOfMeasure,
             product.SalePrice,
-            product.IsActive);
+            product.IsActive,
+            product.SupplierId,
+            product.Supplier == null ? null : product.Supplier.Code,
+            product.Supplier == null ? null : product.Supplier.Name);
 }

@@ -128,6 +128,9 @@ export interface ProductResponse {
   unitOfMeasure: string;
   salePrice: number;
   isActive: boolean;
+  supplierId?: number | null;
+  supplierCode?: string | null;
+  supplierName?: string | null;
 }
 
 export interface CreateProductRequest {
@@ -138,6 +141,8 @@ export interface CreateProductRequest {
   unitOfMeasure: string;
   salePrice: number;
   isActive?: boolean;
+  /** Main supplier; null = none. Always send it on update, or the supplier is cleared. */
+  supplierId?: number | null;
 }
 
 export interface UpdateProductRequest extends CreateProductRequest {}

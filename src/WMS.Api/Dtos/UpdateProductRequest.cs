@@ -21,6 +21,10 @@ public sealed record UpdateProductRequest
     [Required, StringLength(50)]
     public required string UnitOfMeasure { get; init; }
 
+    /// <summary>Main supplier; null = none. Must exist and be active when set or changed.</summary>
+    [Range(1, int.MaxValue)]
+    public int? SupplierId { get; init; }
+
     [MoneyAmount]
     public decimal SalePrice { get; init; }
 

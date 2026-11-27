@@ -37,5 +37,12 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
 
         builder.Property(product => product.IsActive)
             .HasDefaultValue(true);
+
+        builder.HasIndex(product => product.SupplierId);
+
+        builder.HasOne(product => product.Supplier)
+            .WithMany()
+            .HasForeignKey(product => product.SupplierId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

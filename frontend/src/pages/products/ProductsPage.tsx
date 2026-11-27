@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react';
 import {
   Table, Button, Space, Input, Tag, Modal, Form, InputNumber,
-  message, Popconfirm, Switch, Upload, Alert, Tooltip, Card
+  message, Popconfirm, Switch, Upload, Alert, Tooltip, Card, Select
 } from 'antd';
 import {
   PlusOutlined, ReloadOutlined, EditOutlined, SaveOutlined,
   CloseOutlined, CheckCircleOutlined, StopOutlined, DeleteOutlined,
   UploadOutlined, SearchOutlined
 } from '@ant-design/icons';
-import type { ProductResponse } from '../../types';
-import { productsApi } from '../../api/services';
+import type { ProductResponse, SupplierResponse } from '../../types';
+import { productsApi, suppliersApi } from '../../api/services';
 import api from '../../api/client';
 
 export default function ProductsPage() {
@@ -17,6 +17,18 @@ export default function ProductsPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [params, setParams] = useState({ page: 1, pageSize: 20, keyword: '' });
+  const [suppliers, setSuppliers] = useState<SupplierResponse[]>([]);
+  const [supplierFilter, setSupplierFilter] = useState<number | 'none' | undefined>();
+
+  useEffect(() => {
+    suppliersApi.list()
+      .then(({ data: res }) => setSuppliers(Array.isArray(res) ? res : ((res as any)?.items || [])))
+      .catch(() => setSuppliers([]));
+  }, []);
+
+  const supplierOptions = (currentId?: number | null) => suppliers
+    .filter(s => s.isActive || s.id === currentId)
+    .map(s => ({ value: s.id, label: `${s.code} – ${s.name}` }));
 
   // Modal create/edit
   const [modalOpen, setModalOpen] = useState(false);
@@ -45,8 +57,15 @@ export default function ProductsPage() {
         filtered = filtered.filter(p =>
           (p.sku && p.sku.toLowerCase().includes(kw)) ||
           (p.name && p.name.toLowerCase().includes(kw)) ||
-          (p.category && p.category.toLowerCase().includes(kw))
+          (p.category && p.category.toLowerCase().includes(kw)) ||
+          (p.supplierName && p.supplierName.toLowerCase().includes(kw)) ||
+          (p.supplierCode && p.supplierCode.toLowerCase().includes(kw))
         );
+      }
+      if (supplierFilter === 'none') {
+        filtered = filtered.filter(p => !p.supplierId);
+      } else if (supplierFilter) {
+        filtered = filtered.filter(p => p.supplierId === supplierFilter);
       }
       setData(filtered);
       setTotal(filtered.length);
@@ -59,7 +78,7 @@ export default function ProductsPage() {
 
   useEffect(() => {
     fetchData();
-  }, [params]);
+  }, [params, supplierFilter]);
 
   // Inline edit handlers
   const startInlineEdit = (record: ProductResponse) => {
@@ -71,6 +90,7 @@ export default function ProductsPage() {
       salePrice: record.salePrice ?? 0,
       description: record.description || '',
       isActive: record.isActive ?? true,
+      supplierId: record.supplierId ?? null,
     });
   };
 
@@ -91,6 +111,7 @@ export default function ProductsPage() {
         salePrice: Number(values.salePrice) || 0,
         description: values.description,
         isActive: Boolean(values.isActive),
+        supplierId: values.supplierId ?? null,
       });
       message.success(`Đã cập nhật sản phẩm ${record.sku}`);
       setEditingId(null);
@@ -109,6 +130,7 @@ export default function ProductsPage() {
   // Modal Save
   const handleModalSave = async (values: any) => {
     try {
+      values = { ...values, supplierId: values.supplierId ?? null };
       if (editingModal) {
         await productsApi.update(editingModal.id, values);
         message.success('Cập nhật sản phẩm thành công');
@@ -143,6 +165,7 @@ export default function ProductsPage() {
             salePrice: item.salePrice ?? 0,
             description: item.description,
             isActive: activate,
+            supplierId: item.supplierId ?? null,
           });
           successCount++;
         }
@@ -248,6 +271,29 @@ export default function ProductsPage() {
           </Form>
         ) : (
           <Tag color="blue">{v}</Tag>
+        );
+      },
+    },
+    {
+      title: 'Nhà cung cấp',
+      dataIndex: 'supplierName',
+      width: 260,
+      sorter: (a: ProductResponse, b: ProductResponse) => (a.supplierCode || '').localeCompare(b.supplierCode || ''),
+      render: (_: string, r: ProductResponse) => {
+        const isEditing = r.id === editingId;
+        return isEditing ? (
+          <Form form={inlineForm} component={false}>
+            <Form.Item name="supplierId" style={{ margin: 0 }}>
+              <Select size="small" allowClear showSearch optionFilterProp="label" placeholder="Chọn NCC"
+                options={supplierOptions(r.supplierId)} style={{ width: '100%' }} />
+            </Form.Item>
+          </Form>
+        ) : r.supplierId ? (
+          <Tooltip title={r.supplierName}>
+            <span><Tag>{r.supplierCode}</Tag>{r.supplierName}</span>
+          </Tooltip>
+        ) : (
+          <span style={{ color: '#999' }}>—</span>
         );
       },
     },
@@ -393,6 +439,17 @@ export default function ProductsPage() {
               onSearch={(v) => setParams(p => ({ ...p, keyword: v, page: 1 }))}
               style={{ width: 320 }}
             />
+            <Select
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              placeholder="Lọc theo nhà cung cấp"
+              style={{ width: 300 }}
+              value={supplierFilter}
+              onChange={(v) => { setSupplierFilter(v); setParams(p => ({ ...p, page: 1 })); }}
+              options={[{ value: 'none', label: '(Chưa có nhà cung cấp)' },
+                ...suppliers.map(s => ({ value: s.id, label: `${s.code} – ${s.name}` }))]}
+            />
           </Space>
 
           {/* Bulk Action Toolbar (P-14, P-15) */}
@@ -501,6 +558,10 @@ export default function ProductsPage() {
               <Input placeholder="VD: Cái, Hộp, Thùng, Kg" />
             </Form.Item>
           </div>
+          <Form.Item name="supplierId" label="Nhà cung cấp chính">
+            <Select allowClear showSearch optionFilterProp="label" placeholder="Chọn nhà cung cấp (không bắt buộc)"
+              options={supplierOptions(editingModal?.supplierId)} />
+          </Form.Item>
           <Form.Item
             name="salePrice"
             label="Giá bán tiêu chuẩn (₫)"

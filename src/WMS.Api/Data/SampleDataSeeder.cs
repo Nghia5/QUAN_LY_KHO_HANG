@@ -15,7 +15,8 @@ namespace WMS.Api.Data;
 /// <item>every product is stocked in 3–8 warehouses at random bins, each opening stock
 ///       written as an Inventory row plus a Receipt stock movement (ReferenceType OPENING_BALANCE).</item>
 /// </list>
-/// Idempotent: does nothing if the sample warehouses already exist. Deterministic (fixed random seed).
+/// Also 50 suppliers, each the main supplier (Products.SupplierId) of ~20 products of its category.
+/// Idempotent: each part is skipped when its data already exists. Deterministic (fixed random seed).
 /// </summary>
 public static class SampleDataSeeder
 {
@@ -63,9 +64,89 @@ public static class SampleDataSeeder
 
         if (await db.Set<Warehouse>().AnyAsync(w => w.Code == WarehouseCode(1), cancellationToken))
         {
-            log.LogWarning("Sample data already present (warehouse {Code} exists); nothing to do.", WarehouseCode(1));
+            log.LogWarning("Sample warehouses/users/products already present (warehouse {Code} exists); skipping them.", WarehouseCode(1));
+        }
+        else
+        {
+            await SeedCoreAsync(db, hasher, log, cancellationToken);
+        }
+
+        await SeedSuppliersAsync(db, log, cancellationToken);
+    }
+
+    /// <summary>
+    /// 50 suppliers (NCC-001..NCC-050), 5 per product category. The sample products of each category
+    /// are spread round-robin over that category's 5 suppliers (~20 products per supplier).
+    /// Idempotent: skipped when NCC-001 exists.
+    /// </summary>
+    private static async Task SeedSuppliersAsync(WmsDbContext db, ILogger log, CancellationToken cancellationToken)
+    {
+        if (await db.Set<SupplierModel>().AnyAsync(s => s.Code == SupplierCode(1), cancellationToken))
+        {
+            log.LogWarning("Sample suppliers already present ({Code} exists); skipping them.", SupplierCode(1));
             return;
         }
+
+        string[] companyTypes = ["Công ty TNHH", "Công ty Cổ phần", "Công ty TNHH MTV", "Tập đoàn", "Doanh nghiệp tư nhân"];
+        var random = new Random(20261128);
+        var now = DateTime.UtcNow;
+        db.ChangeTracker.AutoDetectChangesEnabled = true; // the core seeding turns it off; product edits below need it
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+
+        var suppliersByCategory = new Dictionary<string, List<SupplierModel>>();
+        var index = 0;
+        foreach (var (category, _, _, _, _) in Catalog)
+        {
+            var list = new List<SupplierModel>();
+            for (var k = 0; k < 5; k++)
+            {
+                index++;
+                var city = Cities[(index - 1) % Cities.Length];
+                list.Add(new SupplierModel
+                {
+                    Code = SupplierCode(index),
+                    Name = $"{companyTypes[k]} {category} {Brands[(index - 1) % Brands.Length]} {city}",
+                    Phone = $"028{random.Next(1_000_000, 9_999_999)}",
+                    Email = $"ncc{index:D3}@supplier.local",
+                    Address = $"Số {random.Next(1, 300)} đường {random.Next(1, 50)}, {city}",
+                    IsActive = true,
+                    CreatedAt = now
+                });
+            }
+
+            suppliersByCategory[category] = list;
+            db.Set<SupplierModel>().AddRange(list);
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        var products = await db.Products
+            .Where(p => p.Sku.StartsWith("PRD-") && p.SupplierId == null)
+            .OrderBy(p => p.Id)
+            .ToListAsync(cancellationToken);
+        var counters = new Dictionary<string, int>();
+        foreach (var product in products)
+        {
+            if (!suppliersByCategory.TryGetValue(product.Category, out var list))
+            {
+                continue;
+            }
+
+            var n = counters.GetValueOrDefault(product.Category);
+            product.SupplierId = list[n % list.Count].Id;
+            counters[product.Category] = n + 1;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        log.LogInformation("Seeded {Suppliers} suppliers and linked {Products} products to them.",
+            index, counters.Values.Sum());
+    }
+
+    private static string SupplierCode(int index) => $"NCC-{index:D3}";
+
+    private static async Task SeedCoreAsync(WmsDbContext db, IPasswordHasher hasher, ILogger log, CancellationToken cancellationToken)
+    {
 
         var roles = await db.Roles.ToDictionaryAsync(r => r.Code, cancellationToken);
         foreach (var code in new[] { "WAREHOUSE_MANAGER", "WAREHOUSE_STAFF", "VIEWER" })
