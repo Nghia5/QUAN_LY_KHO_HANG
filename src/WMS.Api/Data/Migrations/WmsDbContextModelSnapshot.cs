@@ -1553,6 +1553,8 @@ namespace WMS.Api.Data.Migrations
                         {
                             t.HasCheckConstraint("CK_Users_Email_Format", "[Email] LIKE '%_@__%.__%'");
 
+                            t.HasCheckConstraint("CK_Users_SoftDeleteState", "[DeletedAt] IS NULL OR ([IsActive] = 0 AND [DeletedBy] IS NOT NULL AND [DeletedBy] > 0)");
+
                             t.HasCheckConstraint("CK_Users_Username_MinLength", "LEN([Username]) >= 3");
                         });
                 });

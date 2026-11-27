@@ -199,7 +199,11 @@ public sealed class UserService(
         }
 
         await adminGuard.EnsureCanRemoveAsync(user, null, cancellationToken);
-        var deletedByUserId = currentUser.UserId ?? 0;
+        if (currentUser.UserId is not int deletedByUserId || deletedByUserId <= 0)
+        {
+            throw new UnauthorizedException("A valid current user is required to delete an account.");
+        }
+
         user.SoftDelete(deletedByUserId);
 
         // Revoke all tokens immediately so user cannot perform any further authenticated actions

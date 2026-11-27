@@ -1,3 +1,4 @@
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,8 +24,8 @@ public sealed class UserPlatformInitializerTests(SqlServerDatabaseFixture fixtur
         var services = new ServiceCollection();
         services.AddOptions();
         services.AddDbContext<WmsDbContext>(options => options.UseSqlServer(fixture.ConnectionString));
-        services.AddHttpContextAccessor();
-        services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
+        var actor = new FixedCurrentUser(null);
+        services.AddSingleton<ICurrentUser>(actor);
         services.AddSingleton(TimeProvider.System);
         services.AddUserPlatformModule();
         await using var provider = services.BuildServiceProvider();
@@ -40,6 +41,7 @@ public sealed class UserPlatformInitializerTests(SqlServerDatabaseFixture fixtur
 
         await using var db = fixture.CreateContext();
         var admin = await db.Users.SingleAsync();
+        actor.UserId = admin.Id;
         Assert.True(await new UserRepository(db).IsActiveAdminAsync(admin.Id, default));
         var staffPermissions = await db.RolePermissions
             .Where(grant => grant.Role.Code == "WAREHOUSE_STAFF")
@@ -66,6 +68,11 @@ public sealed class UserPlatformInitializerTests(SqlServerDatabaseFixture fixtur
             Password = "Only.For.Test.456",
             RoleIds = [adminRole.Id]
         }, default);
+
+        var invalidState = await Assert.ThrowsAsync<SqlException>(() => db.Database.ExecuteSqlInterpolatedAsync(
+            $"UPDATE dbo.Users SET DeletedAt = SYSUTCDATETIME(), DeletedBy = NULL WHERE Id = {secondAdmin.Id}"));
+        Assert.Equal(547, invalidState.Number);
+        Assert.Contains("CK_Users_SoftDeleteState", invalidState.Message);
 
         await Task.WhenAll(RemoveAdminAsync(admin.Id), RemoveAdminAsync(secondAdmin.Id));
         Assert.Equal(1, await db.Users.CountAsync(user => user.IsActive &&
