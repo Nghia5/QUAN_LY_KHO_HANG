@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import {
   Card, Form, Input, Button, Switch, Space, Table, Tag, Typography,
-  Divider, message, Tabs, Alert, Modal, Row, Col, Statistic
+  Divider, Tabs, Alert, Row, Col, Statistic, App
 } from 'antd';
 import {
   ThunderboltOutlined, SendOutlined, SettingOutlined, HistoryOutlined,
-  CopyOutlined, CheckCircleOutlined, CodeOutlined
+  CopyOutlined, CheckCircleOutlined, CodeOutlined, ExperimentOutlined
 } from '@ant-design/icons';
 import axios from 'axios';
 import { inventoryApi, batchesApi } from '../../api/services';
@@ -82,10 +82,14 @@ const DEFAULT_N8N_WORKFLOW_JSON = {
 };
 
 export default function N8nAlertsPage() {
+  const { message, modal } = App.useApp();
   const [form] = Form.useForm();
   const [testing, setTesting] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [logs, setLogs] = useState<WebhookLog[]>([]);
+  const [isSandbox, setIsSandbox] = useState<boolean>(() => {
+    return localStorage.getItem('wms_n8n_sandbox') === 'true';
+  });
 
   // Load saved webhook config
   useEffect(() => {
@@ -127,7 +131,7 @@ export default function N8nAlertsPage() {
   // Test Webhook
   const handleTestWebhook = async () => {
     const values = form.getFieldsValue();
-    if (!values.webhookUrl) {
+    if (!values.webhookUrl && !isSandbox) {
       message.error('Vui lòng nhập Webhook URL');
       return;
     }
@@ -140,13 +144,30 @@ export default function N8nAlertsPage() {
       idempotencyKey: `IDEMP-${Date.now()}`,
       data: {
         productSku: 'SKU-TEST-001',
-        productName: 'Sản phẩm thử nghiệm kết nối',
-        warehouse: 'Kho Tổng',
+        productName: 'Sản phẩm thử nghiệm kết nối N8N',
+        warehouse: 'Kho Ha Noi',
         currentQuantity: 3,
         minStock: 10,
         message: 'Tồn kho đang ở mức thấp dưới cảnh báo tối thiểu'
       }
     };
+
+    if (isSandbox) {
+      await new Promise(r => setTimeout(r, 400));
+      addLog({
+        id: `LOG-${Date.now()}`,
+        timestamp: new Date().toLocaleString('vi-VN'),
+        eventType: 'TEST_CONNECTION',
+        url: values.webhookUrl ? `${values.webhookUrl} [Sandbox Mock]` : 'Sandbox Mode',
+        payload: testPayload,
+        status: 'SUCCESS',
+        responseCode: 200,
+        message: 'Mô phỏng gửi Webhook thành công (HTTP 200 OK - Mock Sandbox)'
+      });
+      message.success('Mô phỏng gửi N8N Webhook thành công (HTTP 200)! Payload đã được lưu vào lịch sử bên dưới.');
+      setTesting(false);
+      return;
+    }
 
     try {
       const res = await axios.post(values.webhookUrl, testPayload, {
@@ -180,7 +201,25 @@ export default function N8nAlertsPage() {
         responseCode: status,
         message: err.message || 'Không thể kết nối tới N8N Webhook'
       });
-      message.warning(`Gửi payload tới Webhook (N8N phản hồi: ${err.message}). Bạn hãy kiểm tra xem N8N Workflow đã kích hoạt 'Listen for test event' chưa.`);
+
+      modal.warning({
+        title: 'Chưa phát hiện máy chủ N8N đang chạy',
+        width: 600,
+        content: (
+          <div>
+            <p>Trình duyệt không thể kết nối tới <code>{values.webhookUrl}</code> (mã lỗi: <b>{err.message || 'ERR_CONNECTION_REFUSED'}</b>).</p>
+            <div style={{ background: '#fffbe6', border: '1px solid #ffe58f', padding: 12, borderRadius: 6, fontSize: 13, lineHeight: 1.6 }}>
+              <p style={{ margin: 0, fontWeight: 600, color: '#d48806' }}>💡 3 cách giải quyết nhanh:</p>
+              <ul style={{ paddingLeft: 20, margin: '6px 0 0 0' }}>
+                <li><b>Cách 1 (Khuyên dùng khi demo/test):</b> Bật cần gạt <b>"Chế độ mô phỏng (Sandbox / Mock)"</b> bên cạnh để kiểm thử toàn bộ dữ liệu webhook ngay lập tức mà không cần cài N8N.</li>
+                <li><b>Cách 2 (Dùng Webhook online miễn phí):</b> Mở trang <a href="https://webhook.site" target="_blank" rel="noreferrer">https://webhook.site</a>, copy đường link của bạn và dán vào ô Webhook URL để xem request thật gửi qua Internet.</li>
+                <li><b>Cách 3 (Khởi động N8N cục bộ):</b> Mở terminal và chạy lệnh: <code>npx n8n</code> hoặc <code>docker run -it --rm -p 5678:5678 docker.n8n.io/n8nio/n8n</code>.</li>
+              </ul>
+            </div>
+          </div>
+        ),
+        okText: 'Đã hiểu',
+      });
     } finally {
       setTesting(false);
     }
@@ -189,7 +228,7 @@ export default function N8nAlertsPage() {
   // Trigger Real Alert Scan
   const handleScanAndTrigger = async () => {
     const values = form.getFieldsValue();
-    if (!values.webhookUrl) {
+    if (!values.webhookUrl && !isSandbox) {
       message.error('Chưa có cấu hình Webhook URL!');
       return;
     }
@@ -222,16 +261,30 @@ export default function N8nAlertsPage() {
           }
         };
 
-        try {
-          await axios.post(values.webhookUrl, payload, {
-            headers: {
-              'Content-Type': 'application/json',
-              'X-WMS-Secret': values.secretKey || ''
-            },
-            timeout: 5000,
+        if (isSandbox) {
+          addLog({
+            id: `LOG-${Date.now()}-${item.id}`,
+            timestamp: new Date().toLocaleString('vi-VN'),
+            eventType: payload.eventType,
+            url: values.webhookUrl ? `${values.webhookUrl} [Sandbox Mock]` : 'Sandbox Mode',
+            payload,
+            status: 'SUCCESS',
+            responseCode: 200,
+            message: `[Mô phỏng] Cảnh báo tồn kho ${item.productName} (${item.quantity === 0 ? 'Hết hàng' : 'Tồn thấp'})`
           });
           sentCount++;
-        } catch {}
+        } else {
+          try {
+            await axios.post(values.webhookUrl, payload, {
+              headers: {
+                'Content-Type': 'application/json',
+                'X-WMS-Secret': values.secretKey || ''
+              },
+              timeout: 5000,
+            });
+            sentCount++;
+          } catch {}
+        }
       }
 
       // Gửi sự kiện lô sắp hết hạn
@@ -251,29 +304,43 @@ export default function N8nAlertsPage() {
           }
         };
 
-        try {
-          await axios.post(values.webhookUrl, payload, {
-            headers: {
-              'Content-Type': 'application/json',
-              'X-WMS-Secret': values.secretKey || ''
-            },
-            timeout: 5000,
+        if (isSandbox) {
+          addLog({
+            id: `LOG-${Date.now()}-${batch.batchId}`,
+            timestamp: new Date().toLocaleString('vi-VN'),
+            eventType: 'NEAR_EXPIRY',
+            url: values.webhookUrl ? `${values.webhookUrl} [Sandbox Mock]` : 'Sandbox Mode',
+            payload,
+            status: 'SUCCESS',
+            responseCode: 200,
+            message: `[Mô phỏng] Cảnh báo lô ${batch.batchCode} sắp hết hạn trong ${batch.daysToExpiry} ngày`
           });
           sentCount++;
-        } catch {}
+        } else {
+          try {
+            await axios.post(values.webhookUrl, payload, {
+              headers: {
+                'Content-Type': 'application/json',
+                'X-WMS-Secret': values.secretKey || ''
+              },
+              timeout: 5000,
+            });
+            sentCount++;
+          } catch {}
+        }
       }
 
       addLog({
         id: `LOG-${Date.now()}`,
         timestamp: new Date().toLocaleString('vi-VN'),
         eventType: 'SCAN_AND_TRIGGER',
-        url: values.webhookUrl,
+        url: isSandbox ? 'Sandbox Mock Mode' : values.webhookUrl,
         payload: { lowStockCount: lowStockItems.length, expiringBatchesCount: batchRes.items?.length || 0 },
         status: 'SUCCESS',
-        message: `Đã quét và phát hiện ${lowStockItems.length} sản phẩm sắp hết hàng, ${batchRes.items?.length || 0} lô sắp hết hạn. Đã gửi ${sentCount} webhook sang N8N.`
+        message: `${isSandbox ? '[Mô phỏng] ' : ''}Đã quét và phát hiện ${lowStockItems.length} sản phẩm sắp hết hàng, ${batchRes.items?.length || 0} lô sắp hết hạn. Đã gửi ${sentCount} sự kiện webhook.`
       });
 
-      message.success(`Hoàn thành quét! Đã gửi ${sentCount} sự kiện cảnh báo sang N8N`);
+      message.success(`Hoàn thành quét! Đã ${isSandbox ? 'mô phỏng ' : ''}gửi ${sentCount} sự kiện cảnh báo sang N8N`);
     } catch (err: any) {
       message.error('Lỗi khi quét và kích hoạt cảnh báo: ' + err.message);
     } finally {
@@ -320,7 +387,7 @@ export default function N8nAlertsPage() {
           size="small"
           type="link"
           onClick={() => {
-            Modal.info({
+            modal.info({
               title: `Payload ${r.eventType}`,
               width: 600,
               content: (
@@ -349,6 +416,20 @@ export default function N8nAlertsPage() {
           </Typography.Text>
         </div>
         <Space>
+          <Space align="center" style={{ background: isSandbox ? '#f9f0ff' : '#f5f5f5', padding: '5px 12px', borderRadius: 6, border: `1px solid ${isSandbox ? '#d3adf7' : '#d9d9d9'}` }}>
+            <ExperimentOutlined style={{ color: isSandbox ? '#722ed1' : '#8c8c8c', fontSize: 16 }} />
+            <span style={{ fontSize: 13, fontWeight: 500, color: isSandbox ? '#531dab' : '#595959' }}>
+              Chế độ mô phỏng (Sandbox / Mock):
+            </span>
+            <Switch
+              checked={isSandbox}
+              onChange={(val) => {
+                setIsSandbox(val);
+                localStorage.setItem('wms_n8n_sandbox', String(val));
+                message.info(val ? 'Đã bật chế độ mô phỏng Sandbox (không yêu cầu cài đặt N8N)' : 'Đã chuyển sang chế độ gửi Webhook HTTP thực tế');
+              }}
+            />
+          </Space>
           <Button
             type="primary"
             icon={<ThunderboltOutlined />}

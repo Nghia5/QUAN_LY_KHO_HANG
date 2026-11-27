@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Table, Button, Space, Input, Tag, Modal, Form, message, Popconfirm } from 'antd';
+import { Table, Button, Space, Input, Tag, Form, Popconfirm, App, Modal } from 'antd';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import type { WarehouseResponse } from '../../types';
 import { warehousesApi } from '../../api/services';
 
 export default function WarehousesPage() {
+  const { message, modal } = App.useApp();
   const [data, setData] = useState<WarehouseResponse[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -61,7 +62,7 @@ export default function WarehousesPage() {
       fetchData();
     } catch (err: any) {
       const detail = err.response?.data?.detail || err.response?.data?.message || err.message || 'Lỗi thao tác';
-      Modal.error({
+      modal.error({
         title: 'Không thể vô hiệu hóa kho',
         content: (
           <div>
@@ -101,7 +102,7 @@ export default function WarehousesPage() {
       fetchData();
     } catch (err: any) {
       const detail = err.response?.data?.detail || err.response?.data?.message || err.message || 'Lỗi thao tác';
-      Modal.error({
+      modal.error({
         title: 'Không thể xóa kho',
         content: (
           <div>
