@@ -29,10 +29,12 @@ public sealed class StockTransferPayloadValidator : AbstractValidator<IStockTran
         RuleFor(request => request.Reason).MaximumLength(500);
         RuleFor(request => request.Note).MaximumLength(1000);
         RuleFor(request => request.Lines)
+            .Cascade(CascadeMode.Stop)
             .NotEmpty().WithMessage("A transfer needs at least one line.")
             .Must(lines => lines.Count <= GoodsReceiptPayloadValidator.MaxLines)
             .WithMessage($"A transfer can have at most {GoodsReceiptPayloadValidator.MaxLines} lines.");
-        RuleForEach(request => request.Lines).SetValidator(new StockTransferLineRequestValidator());
+        RuleForEach(request => request.Lines)
+            .Cascade(CascadeMode.Stop).NotNull().SetValidator(new StockTransferLineRequestValidator());
     }
 }
 

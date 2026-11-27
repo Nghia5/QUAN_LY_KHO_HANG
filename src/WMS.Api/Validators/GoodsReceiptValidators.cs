@@ -44,9 +44,11 @@ public sealed class GoodsReceiptPayloadValidator : AbstractValidator<IGoodsRecei
         RuleFor(request => request.ReferenceNo).MaximumLength(50);
         RuleFor(request => request.Note).MaximumLength(1000);
         RuleFor(request => request.Lines)
+            .Cascade(CascadeMode.Stop)
             .NotEmpty().WithMessage("A receipt needs at least one line.")
             .Must(lines => lines.Count <= MaxLines).WithMessage($"A receipt can have at most {MaxLines} lines.");
-        RuleForEach(request => request.Lines).SetValidator(new GoodsReceiptLineRequestValidator());
+        RuleForEach(request => request.Lines)
+            .Cascade(CascadeMode.Stop).NotNull().SetValidator(new GoodsReceiptLineRequestValidator());
     }
 }
 

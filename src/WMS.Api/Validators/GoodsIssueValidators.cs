@@ -28,10 +28,12 @@ public sealed class GoodsIssuePayloadValidator : AbstractValidator<IGoodsIssuePa
         RuleFor(request => request.ReferenceNo).MaximumLength(50);
         RuleFor(request => request.Note).MaximumLength(1000);
         RuleFor(request => request.Lines)
+            .Cascade(CascadeMode.Stop)
             .NotEmpty().WithMessage("An issue needs at least one line.")
             .Must(lines => lines.Count <= GoodsReceiptPayloadValidator.MaxLines)
             .WithMessage($"An issue can have at most {GoodsReceiptPayloadValidator.MaxLines} lines.");
-        RuleForEach(request => request.Lines).SetValidator(new GoodsIssueLineRequestValidator());
+        RuleForEach(request => request.Lines)
+            .Cascade(CascadeMode.Stop).NotNull().SetValidator(new GoodsIssueLineRequestValidator());
     }
 }
 

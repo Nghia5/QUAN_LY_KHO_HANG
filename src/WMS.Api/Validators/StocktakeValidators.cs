@@ -8,7 +8,9 @@ public sealed class CreateStocktakeRequestValidator : AbstractValidator<CreateSt
     public CreateStocktakeRequestValidator()
     {
         RuleFor(request => request.WarehouseId).GreaterThan(0);
-        RuleFor(request => request.ScopeLocationIds).Must(ids => ids.Count <= 100).WithMessage("At most 100 scope locations.");
+        RuleFor(request => request.ScopeLocationIds)
+            .Cascade(CascadeMode.Stop).NotNull()
+            .Must(ids => ids.Count <= 100).WithMessage("At most 100 scope locations.");
         RuleForEach(request => request.ScopeLocationIds).GreaterThan(0);
         RuleFor(request => request.Note).MaximumLength(1000);
     }
@@ -18,7 +20,9 @@ public sealed class UpdateStocktakeRequestValidator : AbstractValidator<UpdateSt
 {
     public UpdateStocktakeRequestValidator()
     {
-        RuleFor(request => request.ScopeLocationIds).Must(ids => ids.Count <= 100).WithMessage("At most 100 scope locations.");
+        RuleFor(request => request.ScopeLocationIds)
+            .Cascade(CascadeMode.Stop).NotNull()
+            .Must(ids => ids.Count <= 100).WithMessage("At most 100 scope locations.");
         RuleForEach(request => request.ScopeLocationIds).GreaterThan(0);
         RuleFor(request => request.Note).MaximumLength(1000);
     }
@@ -44,11 +48,14 @@ public sealed class StocktakeCountRequestValidator : AbstractValidator<Stocktake
     public StocktakeCountRequestValidator()
     {
         RuleFor(request => request.Items)
+            .Cascade(CascadeMode.Stop)
             .NotEmpty()
             .Must(items => items.Count <= 1000).WithMessage("At most 1000 items per request.")
-            .Must(items => items.Select(i => (i.ProductId, i.LocationId)).Distinct().Count() == items.Count)
+            .Must(items => items.Any(item => item is null) ||
+                items.Select(item => (item.ProductId, item.LocationId)).Distinct().Count() == items.Count)
             .WithMessage("Each product and location may appear only once per request.");
-        RuleForEach(request => request.Items).SetValidator(new StocktakeCountItemValidator());
+        RuleForEach(request => request.Items)
+            .Cascade(CascadeMode.Stop).NotNull().SetValidator(new StocktakeCountItemValidator());
     }
 }
 
