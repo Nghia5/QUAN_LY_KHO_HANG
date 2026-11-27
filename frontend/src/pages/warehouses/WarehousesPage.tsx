@@ -23,18 +23,45 @@ export default function WarehousesPage() {
 
   const handleSave = async (values: any) => {
     try {
-      if (editing) { await warehousesApi.update(editing.id, values); }
-      else { await warehousesApi.create(values); }
-      message.success('Thành công'); setModalOpen(false); form.resetFields(); setEditing(null); fetchData();
-    } catch (err: any) { message.error(err.response?.data?.message || 'Lỗi'); }
+      if (editing) {
+        await warehousesApi.update(editing.id, values);
+        message.success('Cập nhật kho thành công');
+      } else {
+        await warehousesApi.create(values);
+        message.success('Tạo kho mới thành công');
+      }
+      setModalOpen(false);
+      form.resetFields();
+      setEditing(null);
+      fetchData();
+    } catch (err: any) {
+      const msg = err.response?.data?.detail || err.response?.data?.message || err.message || 'Lỗi thao tác';
+      message.error(msg);
+    }
   };
 
   const columns = [
-    { title: 'Mã kho', dataIndex: 'code', width: 100 },
-    { title: 'Tên kho', dataIndex: 'name' },
+    {
+      title: 'Mã kho',
+      dataIndex: 'code',
+      width: 110,
+      sorter: (a: WarehouseResponse, b: WarehouseResponse) => (a.code || '').localeCompare(b.code || ''),
+      render: (v: string) => <b>{v}</b>,
+    },
+    {
+      title: 'Tên kho',
+      dataIndex: 'name',
+      sorter: (a: WarehouseResponse, b: WarehouseResponse) => (a.name || '').localeCompare(b.name || ''),
+    },
     { title: 'Địa chỉ', dataIndex: 'address', ellipsis: true },
-    { title: 'SĐT', dataIndex: 'phone' },
-    { title: 'Trạng thái', dataIndex: 'isActive', render: (v: boolean) => <Tag color={v ? 'green' : 'red'}>{v ? 'Hoạt động' : 'Ngừng'}</Tag> },
+    { title: 'SĐT', dataIndex: 'phone', width: 130 },
+    {
+      title: 'Trạng thái',
+      dataIndex: 'isActive',
+      width: 120,
+      sorter: (a: WarehouseResponse, b: WarehouseResponse) => Number(a.isActive) - Number(b.isActive),
+      render: (v: boolean) => <Tag color={v ? 'green' : 'red'}>{v ? 'Hoạt động' : 'Ngừng'}</Tag>,
+    },
     {
       title: 'Thao tác', render: (_: any, r: WarehouseResponse) => (
         <Space>

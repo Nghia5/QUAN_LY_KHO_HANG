@@ -14,6 +14,15 @@ public sealed class WarehouseAccess(WmsDbContext dbContext, ICurrentUser current
     public async Task LoadAsync(string permission, CancellationToken cancellationToken)
     {
         var userId = currentUser.UserId ?? throw new UnauthorizedException();
+        var isAdmin = await dbContext.Users.AnyAsync(user => user.Id == userId && user.IsActive &&
+            user.UserRoles.Any(a => a.Role.IsActive && a.Role.Code == "ADMIN"), cancellationToken);
+
+        if (isAdmin)
+        {
+            warehouseIds = null;
+            return;
+        }
+
         warehouseIds = await Grants(userId, permission)
             .Select(a => a.WarehouseId).Distinct().ToArrayAsync(cancellationToken);
 
@@ -23,13 +32,23 @@ public sealed class WarehouseAccess(WmsDbContext dbContext, ICurrentUser current
         }
     }
 
-    public Task<bool> HasAsync(string permission, int warehouseId, CancellationToken cancellationToken) =>
-        currentUser.UserId is int userId
-            ? Grants(userId, permission).AnyAsync(a => a.WarehouseId == warehouseId, cancellationToken)
-            : Task.FromResult(false);
+    public async Task<bool> HasAsync(string permission, int warehouseId, CancellationToken cancellationToken)
+    {
+        if (currentUser.UserId is not int userId) return false;
+        var isAdmin = await dbContext.Users.AnyAsync(user => user.Id == userId && user.IsActive &&
+            user.UserRoles.Any(a => a.Role.IsActive && a.Role.Code == "ADMIN"), cancellationToken);
+        if (isAdmin) return true;
+        return await Grants(userId, permission).AnyAsync(a => a.WarehouseId == warehouseId, cancellationToken);
+    }
 
-    public Task<bool> HasAnyAsync(string permission, CancellationToken cancellationToken) =>
-        currentUser.UserId is int userId ? Grants(userId, permission).AnyAsync(cancellationToken) : Task.FromResult(false);
+    public async Task<bool> HasAnyAsync(string permission, CancellationToken cancellationToken)
+    {
+        if (currentUser.UserId is not int userId) return false;
+        var isAdmin = await dbContext.Users.AnyAsync(user => user.Id == userId && user.IsActive &&
+            user.UserRoles.Any(a => a.Role.IsActive && a.Role.Code == "ADMIN"), cancellationToken);
+        if (isAdmin) return true;
+        return await Grants(userId, permission).AnyAsync(cancellationToken);
+    }
 
     private IQueryable<WarehouseRoleAssignment> Grants(int userId, string permission) =>
         dbContext.Set<WarehouseRoleAssignment>()
@@ -38,7 +57,7 @@ public sealed class WarehouseAccess(WmsDbContext dbContext, ICurrentUser current
 
     public void Require(int warehouseId)
     {
-        if (warehouseIds is null || !warehouseIds.Contains(warehouseId))
+        if (warehouseIds is not null && !warehouseIds.Contains(warehouseId))
         {
             throw new ForbiddenException("The operation is outside the assigned warehouse scope.");
         }
@@ -46,7 +65,7 @@ public sealed class WarehouseAccess(WmsDbContext dbContext, ICurrentUser current
 
     public void RequireEither(int sourceId, int destinationId)
     {
-        if (warehouseIds is null || (!warehouseIds.Contains(sourceId) && !warehouseIds.Contains(destinationId)))
+        if (warehouseIds is not null && (!warehouseIds.Contains(sourceId) && !warehouseIds.Contains(destinationId)))
         {
             throw new ForbiddenException("The transfer is outside the assigned warehouse scope.");
         }
