@@ -80,7 +80,7 @@ public sealed class WarehouseAccessTests(SqlServerDatabaseFixture fixture) : ICl
                 ["Storage:UploadDirectory"] = storageDirectory.FullName
             }).Build();
             var storage = new FileStorageService(new UploadedFileRepository(db), null!, config, TimeProvider.System,
-                attachmentAccess, NullLogger<FileStorageService>.Instance);
+                attachmentAccess, new FixedCurrentUser(user.Id), NullLogger<FileStorageService>.Instance);
             using var content = new MemoryStream([1]);
             var response = await storage.UploadDocumentAsync(new UploadDocumentRequest
             {
