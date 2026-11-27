@@ -312,8 +312,10 @@ export interface DocumentWorkflowInfo {
 
 export interface DocumentAction {
   action: string;
-  label: string;
+  label?: string;
 }
+
+export type DocumentActionItem = DocumentAction | string;
 
 /* ── Goods Receipts ── */
 export interface GoodsReceiptLineRequest {
@@ -384,7 +386,7 @@ export interface GoodsReceiptDetail {
   totalQuantity: number;
   lines: GoodsReceiptLineResponse[];
   workflow: DocumentWorkflowInfo;
-  availableActions: DocumentAction[];
+  availableActions: DocumentActionItem[];
 }
 
 /* ── Goods Issues ── */
@@ -437,7 +439,7 @@ export interface GoodsIssueDetail {
   totalQuantity: number;
   lines: GoodsIssueLineResponse[];
   workflow: DocumentWorkflowInfo;
-  availableActions: DocumentAction[];
+  availableActions: DocumentActionItem[];
 }
 
 export interface GoodsIssueLineResponse {
@@ -502,7 +504,7 @@ export interface StockTransferDetail {
   lines: StockTransferLineResponse[];
   workflow: DocumentWorkflowInfo;
   progress: TransferProgressInfo;
-  availableActions: DocumentAction[];
+  availableActions: DocumentActionItem[];
 }
 
 export interface StockTransferLineResponse {
@@ -571,7 +573,7 @@ export interface StocktakeDetail {
   totals: StocktakeTotals;
   lines: StocktakeLineResponse[];
   workflow: DocumentWorkflowInfo;
-  availableActions: DocumentAction[];
+  availableActions: DocumentActionItem[];
 }
 
 export interface StocktakeTotals {
@@ -645,7 +647,7 @@ export interface StockAdjustmentDetail {
   requiresApproval: boolean;
   lines: StockAdjustmentLineResponse[];
   workflow: DocumentWorkflowInfo;
-  availableActions: DocumentAction[];
+  availableActions: DocumentActionItem[];
 }
 
 export interface StockAdjustmentLineResponse {

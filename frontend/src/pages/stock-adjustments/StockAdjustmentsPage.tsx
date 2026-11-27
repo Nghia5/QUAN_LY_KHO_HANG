@@ -92,7 +92,23 @@ export default function StockAdjustmentsPage() {
 
   const handleAction = async (action: string, reason?: string) => {
     if (!detail) return;
-    const fn = (stockAdjustmentsApi as any)[action];
+    const act = action.toLowerCase();
+    if (act === 'delete') {
+      try {
+        await stockAdjustmentsApi.delete(detail.id);
+        message.success('Đã xóa phiếu điều chỉnh thành công');
+        setDrawerOpen(false);
+        fetchData();
+      } catch (err: any) {
+        message.error(err.response?.data?.detail || err.response?.data?.message || 'Không thể xóa phiếu');
+      }
+      return;
+    }
+    if (act === 'edit') {
+      message.info('Để chỉnh sửa, bạn có thể xóa phiếu nháp này và tạo lại.');
+      return;
+    }
+    const fn = (stockAdjustmentsApi as any)[act] || (stockAdjustmentsApi as any)[action];
     if (fn) {
       try {
         if (reason) await fn(detail.id, reason);
@@ -101,8 +117,11 @@ export default function StockAdjustmentsPage() {
         await showDetail(detail.id);
         fetchData();
       } catch (err: any) {
-        message.error(err.response?.data?.message || 'Thao tác không thành công');
+        const msg = err.response?.data?.detail || err.response?.data?.message || err.message || 'Thao tác không thành công';
+        message.error(msg);
       }
+    } else {
+      message.warning(`Chưa hỗ trợ thao tác: ${action}`);
     }
   };
 

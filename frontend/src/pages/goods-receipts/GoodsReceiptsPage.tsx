@@ -80,7 +80,23 @@ export default function GoodsReceiptsPage() {
 
   const handleAction = async (action: string, reason?: string) => {
     if (!detail) return;
-    const fn = (goodsReceiptsApi as any)[action];
+    const act = action.toLowerCase();
+    if (act === 'delete') {
+      try {
+        await goodsReceiptsApi.delete(detail.id);
+        message.success('Đã xóa phiếu nhập kho thành công');
+        setDrawerOpen(false);
+        fetchData();
+      } catch (err: any) {
+        message.error(err.response?.data?.detail || err.response?.data?.message || 'Không thể xóa phiếu');
+      }
+      return;
+    }
+    if (act === 'edit') {
+      message.info('Để chỉnh sửa thông tin hàng hóa, bạn có thể xóa phiếu nháp này và tạo lại.');
+      return;
+    }
+    const fn = (goodsReceiptsApi as any)[act] || (goodsReceiptsApi as any)[action];
     if (fn) {
       try {
         if (reason) await fn(detail.id, reason);
@@ -92,6 +108,8 @@ export default function GoodsReceiptsPage() {
         const msg = err.response?.data?.detail || err.response?.data?.message || err.message || 'Thao tác không thành công';
         message.error(msg);
       }
+    } else {
+      message.warning(`Chưa hỗ trợ thao tác: ${action}`);
     }
   };
 

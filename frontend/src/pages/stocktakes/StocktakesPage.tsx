@@ -77,7 +77,27 @@ export default function StocktakesPage() {
 
   const handleAction = async (action: string, reason?: string) => {
     if (!detail) return;
-    const fn = (stocktakesApi as any)[action];
+    const act = action.toLowerCase();
+    if (act === 'delete') {
+      try {
+        await stocktakesApi.delete(detail.id);
+        message.success('Đã xóa đợt kiểm kê thành công');
+        setDrawerOpen(false);
+        fetchData();
+      } catch (err: any) {
+        message.error(err.response?.data?.detail || err.response?.data?.message || 'Không thể xóa phiếu');
+      }
+      return;
+    }
+    if (act === 'count') {
+      setCountModalOpen(true);
+      return;
+    }
+    if (act === 'edit') {
+      message.info('Để chỉnh sửa phạm vi, bạn có thể xóa đợt kiểm kê nháp này và tạo lại.');
+      return;
+    }
+    const fn = (stocktakesApi as any)[act] || (stocktakesApi as any)[action];
     if (fn) {
       try {
         if (reason) await fn(detail.id, reason);
@@ -86,8 +106,11 @@ export default function StocktakesPage() {
         await showDetail(detail.id);
         fetchData();
       } catch (err: any) {
-        message.error(err.response?.data?.message || 'Thao tác không thành công');
+        const msg = err.response?.data?.detail || err.response?.data?.message || err.message || 'Thao tác không thành công';
+        message.error(msg);
       }
+    } else {
+      message.warning(`Chưa hỗ trợ thao tác: ${action}`);
     }
   };
 
