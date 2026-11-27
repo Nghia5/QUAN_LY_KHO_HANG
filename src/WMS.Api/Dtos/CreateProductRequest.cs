@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using WMS.Api.Validators;
 
 namespace WMS.Api.Dtos;
 
@@ -20,7 +21,7 @@ public sealed record CreateProductRequest
     [Required, StringLength(50)]
     public required string UnitOfMeasure { get; init; }
 
-    [Range(typeof(decimal), "0", "9999999999999999.99")]
+    [MoneyAmount]
     public decimal SalePrice { get; init; }
 
     public bool IsActive { get; init; } = true;
