@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
-  Table, Button, Space, Input, Select, message, Drawer, Descriptions,
-  Divider, Modal, Form, InputNumber, Card, Tag
+  Table, Button, Space, Input, Select, Drawer, Descriptions,
+  Divider, Modal, Form, InputNumber, Card, Tag, Alert, App
 } from 'antd';
 import {
   PlusOutlined, ReloadOutlined, EyeOutlined, DeleteOutlined
@@ -16,6 +16,7 @@ import {
 import { StatusTag, DocumentActions } from '../../components/DocumentActions';
 
 export default function GoodsReceiptsPage() {
+  const { message, modal } = App.useApp();
   const [data, setData] = useState<GoodsReceiptSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -88,7 +89,8 @@ export default function GoodsReceiptsPage() {
         await showDetail(detail.id);
         fetchData();
       } catch (err: any) {
-        message.error(err.response?.data?.message || 'Thao tác không thành công');
+        const msg = err.response?.data?.detail || err.response?.data?.message || err.message || 'Thao tác không thành công';
+        message.error(msg);
       }
     }
   };
@@ -116,7 +118,35 @@ export default function GoodsReceiptsPage() {
       createForm.resetFields();
       fetchData();
     } catch (err: any) {
-      message.error(err.response?.data?.message || 'Không thể tạo phiếu nhập kho');
+      const detail = err.response?.data?.detail || err.response?.data?.message || err.message || 'Không thể tạo phiếu nhập kho';
+      modal.error({
+        title: 'Không thể tạo phiếu nhập kho (Quy tắc nghiệp vụ WMS)',
+        content: (
+          <div>
+            <p>Hệ thống từ chối tạo phiếu nhập kho do vi phạm quy tắc ràng buộc:</p>
+            <div
+              style={{
+                background: '#fff2f0',
+                border: '1px solid #ffccc7',
+                padding: '10px 14px',
+                borderRadius: 6,
+                color: '#cf1322',
+                fontSize: 13,
+                lineHeight: 1.6,
+                marginTop: 8,
+              }}
+            >
+              {detail}
+            </div>
+            <p style={{ marginTop: 12, color: '#666', fontSize: 13 }}>
+              * <b>Lưu ý quan trọng:</b> Hàng hóa trong kho chỉ có thể nhập vào vị trí ô chứa hàng cấp <b>Bin</b> (các cấp
+              Zone, Rack, Shelf là cấp cha nhóm vị trí, không thể nhập hàng trực tiếp).
+            </p>
+          </div>
+        ),
+        width: 560,
+        okText: 'Đã hiểu',
+      });
     }
   };
 
@@ -214,6 +244,15 @@ export default function GoodsReceiptsPage() {
         width={850}
       >
         <Form form={createForm} layout="vertical" onFinish={handleCreateReceipt}>
+          {selectedWarehouseForCreate && (locations || []).filter(l => l.type === 'Bin').length === 0 && (
+            <Alert
+              type="warning"
+              showIcon
+              message="Kho này chưa có Ô chứa hàng (Bin)"
+              description="Hàng hóa chỉ có thể nhập vào ô chứa hàng cấp Bin. Vui lòng vào trang 'Vị trí kho' để tạo thêm phân cấp Zone > Rack > Shelf > Bin cho kho này."
+              style={{ marginBottom: 16 }}
+            />
+          )}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <Form.Item
               name="warehouseId"
@@ -278,8 +317,12 @@ export default function GoodsReceiptsPage() {
                       style={{ flex: 3, margin: 0 }}
                     >
                       <Select
-                        placeholder="Vị trí ô chứa"
-                        options={(locations || []).map(l => ({ value: l.id, label: `${l.code} - ${l.name}` }))}
+                        placeholder="Vị trí ô chứa (Bin)"
+                        options={(locations || []).map(l => ({
+                          value: l.id,
+                          label: l.type === 'Bin' ? `📦 [Bin] ${l.code} - ${l.name}` : `🚫 [${l.type}] ${l.code} (Cần chọn Bin)`,
+                          disabled: l.type !== 'Bin',
+                        }))}
                         disabled={!selectedWarehouseForCreate}
                       />
                     </Form.Item>

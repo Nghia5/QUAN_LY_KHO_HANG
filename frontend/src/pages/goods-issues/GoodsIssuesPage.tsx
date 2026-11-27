@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
-  Table, Button, Space, Input, Select, message, Drawer, Descriptions,
-  Divider, Modal, Form, InputNumber, Card, Tag
+  Table, Button, Space, Input, Select, Drawer, Descriptions,
+  Divider, Modal, Form, InputNumber, Card, Tag, App
 } from 'antd';
 import {
   PlusOutlined, ReloadOutlined, EyeOutlined, DeleteOutlined
@@ -16,6 +16,7 @@ import {
 import { StatusTag, DocumentActions } from '../../components/DocumentActions';
 
 export default function GoodsIssuesPage() {
+  const { message, modal } = App.useApp();
   const [data, setData] = useState<GoodsIssueSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -85,7 +86,8 @@ export default function GoodsIssuesPage() {
         await showDetail(detail.id);
         fetchData();
       } catch (err: any) {
-        message.error(err.response?.data?.message || 'Thao tác không thành công');
+        const msg = err.response?.data?.detail || err.response?.data?.message || err.message || 'Thao tác không thành công';
+        message.error(msg);
       }
     }
   };
@@ -109,7 +111,35 @@ export default function GoodsIssuesPage() {
       createForm.resetFields();
       fetchData();
     } catch (err: any) {
-      message.error(err.response?.data?.message || 'Không thể tạo phiếu xuất kho');
+      const detail = err.response?.data?.detail || err.response?.data?.message || err.message || 'Không thể tạo phiếu xuất kho';
+      modal.error({
+        title: 'Không thể tạo phiếu xuất kho (Quy tắc nghiệp vụ WMS)',
+        content: (
+          <div>
+            <p>Hệ thống từ chối tạo phiếu xuất kho:</p>
+            <div
+              style={{
+                background: '#fff2f0',
+                border: '1px solid #ffccc7',
+                padding: '10px 14px',
+                borderRadius: 6,
+                color: '#cf1322',
+                fontSize: 13,
+                lineHeight: 1.6,
+                marginTop: 8,
+              }}
+            >
+              {detail}
+            </div>
+            <p style={{ marginTop: 12, color: '#666', fontSize: 13 }}>
+              * <b>Lưu ý quan trọng:</b> Hàng hóa chỉ được xuất từ vị trí ô chứa hàng cấp <b>Bin</b> (và phải còn đủ số
+              lượng tồn khả dụng tại Bin đó).
+            </p>
+          </div>
+        ),
+        width: 560,
+        okText: 'Đã hiểu',
+      });
     }
   };
 
@@ -259,8 +289,12 @@ export default function GoodsIssuesPage() {
                       style={{ flex: 4, margin: 0 }}
                     >
                       <Select
-                        placeholder="Vị trí lấy hàng"
-                        options={(locations || []).map(l => ({ value: l.id, label: `${l.code} - ${l.name}` }))}
+                        placeholder="Vị trí lấy hàng (Bin)"
+                        options={(locations || []).map(l => ({
+                          value: l.id,
+                          label: l.type === 'Bin' ? `📦 [Bin] ${l.code} - ${l.name}` : `🚫 [${l.type}] ${l.code} (Cần chọn Bin)`,
+                          disabled: l.type !== 'Bin',
+                        }))}
                         disabled={!selectedWarehouseForCreate}
                       />
                     </Form.Item>
