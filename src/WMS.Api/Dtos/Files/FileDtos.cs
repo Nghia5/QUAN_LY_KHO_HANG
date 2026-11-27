@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Http;
+using WMS.Api.Models;
 using WMS.Api.Models.Documents;
 
 namespace WMS.Api.Dtos.Files;
@@ -16,6 +17,16 @@ public sealed record UploadAvatarRequest : IValidatableObject
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
+        if (File is null)
+        {
+            yield break;
+        }
+
+        foreach (var error in UploadFileMetadataValidation.Validate(File))
+        {
+            yield return error;
+        }
+
         if (File.Length == 0)
         {
             yield return new ValidationResult("The uploaded file is empty.", [nameof(File)]);
@@ -35,7 +46,7 @@ public sealed record UploadAvatarRequest : IValidatableObject
                 [nameof(File)]);
         }
 
-        if (!AllowedMimeTypes.Contains(File.ContentType.ToLowerInvariant()))
+        if (!AllowedMimeTypes.Contains(File.ContentType, StringComparer.OrdinalIgnoreCase))
         {
             yield return new ValidationResult("File MIME type is not a recognized valid image format.", [nameof(File)]);
         }
@@ -64,6 +75,16 @@ public sealed record UploadDocumentRequest : IValidatableObject
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
+        if (File is null)
+        {
+            yield break;
+        }
+
+        foreach (var error in UploadFileMetadataValidation.Validate(File))
+        {
+            yield return error;
+        }
+
         if (File.Length == 0)
         {
             yield return new ValidationResult("The uploaded file is empty.", [nameof(File)]);
@@ -81,6 +102,28 @@ public sealed record UploadDocumentRequest : IValidatableObject
             yield return new ValidationResult(
                 $"File extension '{extension}' is not allowed. Supported formats: {string.Join(", ", AllowedExtensions)}.",
                 [nameof(File)]);
+        }
+    }
+}
+
+internal static class UploadFileMetadataValidation
+{
+    public static IEnumerable<ValidationResult> Validate(IFormFile file)
+    {
+        var name = Path.GetFileName(file.FileName);
+        if (string.IsNullOrWhiteSpace(name) || name.Length > UploadedFile.MaxOriginalFileNameLength)
+        {
+            yield return new ValidationResult(
+                $"The file name must have 1 to {UploadedFile.MaxOriginalFileNameLength} characters.",
+                [nameof(UploadDocumentRequest.File)]);
+        }
+
+        var contentType = file.ContentType;
+        if (string.IsNullOrWhiteSpace(contentType) || contentType.Length > UploadedFile.MaxContentTypeLength)
+        {
+            yield return new ValidationResult(
+                $"The file content type must have 1 to {UploadedFile.MaxContentTypeLength} characters.",
+                [nameof(UploadDocumentRequest.File)]);
         }
     }
 }

@@ -17,7 +17,7 @@ public sealed class UploadedFileConfiguration : IEntityTypeConfiguration<Uploade
         builder.HasIndex(file => new { file.DocumentType, file.DocumentId });
 
         builder.Property(file => file.OriginalFileName)
-            .HasMaxLength(255)
+            .HasMaxLength(UploadedFile.MaxOriginalFileNameLength)
             .IsRequired();
 
         builder.Property(file => file.StoredFileName)
@@ -29,7 +29,7 @@ public sealed class UploadedFileConfiguration : IEntityTypeConfiguration<Uploade
             .IsRequired();
 
         builder.Property(file => file.ContentType)
-            .HasMaxLength(100)
+            .HasMaxLength(UploadedFile.MaxContentTypeLength)
             .IsRequired();
 
         builder.Property(file => file.UploadedAt)

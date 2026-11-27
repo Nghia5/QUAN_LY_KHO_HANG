@@ -8,11 +8,14 @@ namespace WMS.Api.Models;
 /// </summary>
 public sealed class UploadedFile : IValidatableObject
 {
+    public const int MaxOriginalFileNameLength = 255;
+    public const int MaxContentTypeLength = 100;
+
     [Key]
     public Guid Id { get; set; } = Guid.NewGuid();
 
     [Required(ErrorMessage = "Original file name is required.")]
-    [StringLength(255, MinimumLength = 1, ErrorMessage = "Original file name cannot exceed 255 characters.")]
+    [StringLength(MaxOriginalFileNameLength, MinimumLength = 1, ErrorMessage = "Original file name cannot exceed 255 characters.")]
     public required string OriginalFileName { get; set; }
 
     [Required(ErrorMessage = "Stored file name is required.")]
@@ -24,7 +27,7 @@ public sealed class UploadedFile : IValidatableObject
     public required string FilePath { get; set; }
 
     [Required(ErrorMessage = "Content type is required.")]
-    [StringLength(100, MinimumLength = 1, ErrorMessage = "Content type cannot exceed 100 characters.")]
+    [StringLength(MaxContentTypeLength, MinimumLength = 1, ErrorMessage = "Content type cannot exceed 100 characters.")]
     public required string ContentType { get; set; }
 
     [Range(1, 104857600, ErrorMessage = "File size must be between 1 byte and 100 MB.")]
