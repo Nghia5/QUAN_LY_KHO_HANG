@@ -1,6 +1,48 @@
 @WMS.Api_HostAddress = http://localhost:5237
 
-GET {{WMS.Api_HostAddress}}/weatherforecast/
+### Get all products
+GET {{WMS.Api_HostAddress}}/api/products
 Accept: application/json
 
 ###
+
+### Get a product by ID
+GET {{WMS.Api_HostAddress}}/api/products/1
+Accept: application/json
+
+###
+
+### Create a product
+POST {{WMS.Api_HostAddress}}/api/products
+Content-Type: application/json
+
+{
+  "sku": "SKU-1001",
+  "name": "Wireless Barcode Scanner",
+  "description": "Bluetooth barcode scanner",
+  "category": "Equipment",
+  "unitOfMeasure": "piece",
+  "salePrice": 89.99,
+  "isActive": true
+}
+
+###
+
+### Update a product
+PUT {{WMS.Api_HostAddress}}/api/products/1
+Content-Type: application/json
+
+{
+  "sku": "SKU-1001",
+  "name": "Wireless Barcode Scanner",
+  "description": "Updated Bluetooth barcode scanner",
+  "category": "Equipment",
+  "unitOfMeasure": "piece",
+  "salePrice": 94.99,
+  "isActive": true
+}
+
+###
+
+### Delete a product
+DELETE {{WMS.Api_HostAddress}}/api/products/1
