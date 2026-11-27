@@ -53,7 +53,7 @@ export default function StocktakesPage() {
 
   useEffect(() => {
     warehousesApi.list({ pageSize: 100 }).then(r => setWarehouses(r.data.items)).catch(() => {});
-    productsApi.list({ pageSize: 200 }).then(r => setProducts(r.data.items)).catch(() => {});
+    productsApi.list({ pageSize: 100 }).then(r => setProducts(r.data.items)).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -66,7 +66,7 @@ export default function StocktakesPage() {
       setDetail(data);
       setDrawerOpen(true);
       if (data.warehouseId) {
-        locationsApi.list(data.warehouseId, { pageSize: 200 })
+        locationsApi.list(data.warehouseId, { pageSize: 100 })
           .then(r => setLocations(r.data.items))
           .catch(() => {});
       }

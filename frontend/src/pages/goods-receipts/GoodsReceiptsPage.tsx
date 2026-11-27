@@ -49,7 +49,7 @@ export default function GoodsReceiptsPage() {
   useEffect(() => {
     warehousesApi.list({ pageSize: 100 }).then(r => setWarehouses(r.data.items)).catch(() => {});
     suppliersApi.list({ pageSize: 100 }).then(r => setSuppliers(r.data.items)).catch(() => {});
-    productsApi.list({ pageSize: 200 }).then(r => setProducts(r.data.items)).catch(() => {});
+    productsApi.list({ pageSize: 100 }).then(r => setProducts(r.data.items)).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -59,7 +59,7 @@ export default function GoodsReceiptsPage() {
   // Load locations khi chọn kho trong modal tạo mới
   useEffect(() => {
     if (selectedWarehouseForCreate) {
-      locationsApi.list(selectedWarehouseForCreate, { pageSize: 200 })
+      locationsApi.list(selectedWarehouseForCreate, { pageSize: 100 })
         .then(r => setLocations(r.data.items))
         .catch(() => {});
     } else {

@@ -51,7 +51,7 @@ export default function LocationsPage() {
     setLoading(true);
     try {
       const [listRes, treeRes] = await Promise.all([
-        locationsApi.list(selectedWarehouseId, { page: 1, pageSize: 200 }),
+        locationsApi.list(selectedWarehouseId, { page: 1, pageSize: 100 }),
         locationsApi.tree(selectedWarehouseId),
       ]);
       setLocations(listRes.data.items);

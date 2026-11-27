@@ -63,7 +63,7 @@ export default function StockAdjustmentsPage() {
 
   useEffect(() => {
     warehousesApi.list({ pageSize: 100 }).then(r => setWarehouses(r.data.items)).catch(() => {});
-    productsApi.list({ pageSize: 200 }).then(r => setProducts(r.data.items)).catch(() => {});
+    productsApi.list({ pageSize: 100 }).then(r => setProducts(r.data.items)).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -72,7 +72,7 @@ export default function StockAdjustmentsPage() {
 
   useEffect(() => {
     if (selectedWarehouseForCreate) {
-      locationsApi.list(selectedWarehouseForCreate, { pageSize: 200 })
+      locationsApi.list(selectedWarehouseForCreate, { pageSize: 100 })
         .then(r => setLocations(r.data.items))
         .catch(() => {});
     } else {

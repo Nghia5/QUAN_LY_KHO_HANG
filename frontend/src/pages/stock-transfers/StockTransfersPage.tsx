@@ -49,7 +49,7 @@ export default function StockTransfersPage() {
 
   useEffect(() => {
     warehousesApi.list({ pageSize: 100 }).then(r => setWarehouses(r.data.items)).catch(() => {});
-    productsApi.list({ pageSize: 200 }).then(r => setProducts(r.data.items)).catch(() => {});
+    productsApi.list({ pageSize: 100 }).then(r => setProducts(r.data.items)).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -59,7 +59,7 @@ export default function StockTransfersPage() {
   // Load vị trí khi chọn kho nguồn / đích
   useEffect(() => {
     if (selectedSourceWh) {
-      locationsApi.list(selectedSourceWh, { pageSize: 200 }).then(r => setSourceLocations(r.data.items)).catch(() => {});
+      locationsApi.list(selectedSourceWh, { pageSize: 100 }).then(r => setSourceLocations(r.data.items)).catch(() => {});
     } else {
       setSourceLocations([]);
     }
@@ -67,7 +67,7 @@ export default function StockTransfersPage() {
 
   useEffect(() => {
     if (selectedDestWh) {
-      locationsApi.list(selectedDestWh, { pageSize: 200 }).then(r => setDestLocations(r.data.items)).catch(() => {});
+      locationsApi.list(selectedDestWh, { pageSize: 100 }).then(r => setDestLocations(r.data.items)).catch(() => {});
     } else {
       setDestLocations([]);
     }

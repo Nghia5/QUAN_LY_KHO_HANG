@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { ConfigProvider, Spin } from 'antd';
+import { ConfigProvider, Spin, App as AntApp } from 'antd';
 import viVN from 'antd/locale/vi_VN';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import AppLayout from './components/AppLayout';
@@ -61,11 +61,13 @@ function AppRoutes() {
 export default function App() {
   return (
     <ConfigProvider locale={viVN} theme={{ token: { colorPrimary: '#1677ff', borderRadius: 6 } }}>
-      <BrowserRouter>
-        <AuthProvider>
-          <AppRoutes />
-        </AuthProvider>
-      </BrowserRouter>
+      <AntApp>
+        <BrowserRouter>
+          <AuthProvider>
+            <AppRoutes />
+          </AuthProvider>
+        </BrowserRouter>
+      </AntApp>
     </ConfigProvider>
   );
 }

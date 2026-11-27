@@ -12,6 +12,12 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  // Clamp pageSize to maximum 100 allowed by backend validation
+  if (config.params && typeof config.params === 'object') {
+    if (config.params.pageSize && Number(config.params.pageSize) > 100) {
+      config.params.pageSize = 100;
+    }
+  }
   return config;
 });
 
