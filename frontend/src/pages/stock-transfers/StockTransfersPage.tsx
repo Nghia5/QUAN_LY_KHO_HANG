@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
-  Table, Button, Space, Input, Select, message, Drawer, Descriptions,
+  Table, Button, Space, Input, Select, Drawer, Descriptions, App,
   Divider, Steps, Modal, Form, InputNumber, Card, Tag
 } from 'antd';
 import {
@@ -16,6 +16,7 @@ import {
 import { StatusTag, DocumentActions } from '../../components/DocumentActions';
 
 export default function StockTransfersPage() {
+  const { message, modal } = App.useApp();
   const [data, setData] = useState<StockTransferSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -111,7 +112,34 @@ export default function StockTransfersPage() {
         fetchData();
       } catch (err: any) {
         const msg = err.response?.data?.detail || err.response?.data?.message || err.message || 'Thao tác không thành công';
-        message.error(msg);
+        if (err.response?.status === 422) {
+          modal.warning({
+            title: 'Quy tắc nghiệp vụ WMS',
+            content: (
+              <div>
+                <p>Hệ thống không thể thực hiện thao tác do ràng buộc nghiệp vụ kho:</p>
+                <div
+                  style={{
+                    background: '#fffbe6',
+                    border: '1px solid #ffe58f',
+                    padding: '10px 14px',
+                    borderRadius: 6,
+                    color: '#d46b08',
+                    fontSize: 13,
+                    lineHeight: 1.6,
+                    marginTop: 8,
+                  }}
+                >
+                  {msg}
+                </div>
+              </div>
+            ),
+            width: 540,
+            okText: 'Đã hiểu',
+          });
+        } else {
+          message.error(msg);
+        }
       }
     } else {
       message.warning(`Chưa hỗ trợ thao tác: ${action}`);
